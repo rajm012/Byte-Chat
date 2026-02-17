@@ -281,6 +281,8 @@ export const groupService = {
     description?: string;
     target_user_id?: string;
     expires_in_hours?: number;
+    parent_poll_id?: string;
+    objection_reason?: string;
   }) => {
     const token = localStorage.getItem('accessToken');
     const response = await fetch(`${API_URL}/${groupId}/polls`, {

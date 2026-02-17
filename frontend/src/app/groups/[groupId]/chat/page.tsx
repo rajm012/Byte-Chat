@@ -9,6 +9,7 @@ import { useSocket } from '@/contexts/SocketContext';
 import { useToast } from '@/contexts/ToastContext';
 import type { Message, Poll } from '@/types/chat.types';
 import { Theme } from 'emoji-picker-react';
+import CreateRemovalPoll from '@/components/CreateRemovalPoll';
 
 // Dynamic import for emoji picker (client-side only)
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
@@ -23,6 +24,21 @@ interface GroupMessage extends Message {
   };
 }
 
+interface GroupMember {
+  member_id: string;
+  user_id: string;
+  is_admin: boolean;
+  is_owner: boolean;
+  is_anonymous: boolean;
+  joined_at: string;
+  name: string;
+  roll_no: string;
+  dp_url: string | null;
+  branch: string;
+  anonymous_name: string | null;
+  anonymous_gender: string | null;
+}
+
 export default function GroupChatPage() {
   const params = useParams();
   const router = useRouter();
@@ -32,6 +48,9 @@ export default function GroupChatPage() {
 
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [polls, setPolls] = useState<Poll[]>([]);
+  const [members, setMembers] = useState<GroupMember[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [groupName, setGroupName] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -46,9 +65,11 @@ export default function GroupChatPage() {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-      fetchPolls();
+    fetchPolls();
+    fetchGroupDetails();
     if (groupId) {
       fetchMessages();
+      fetchMembers();
 
       if (isConnected) {
         joinGroup(groupId);
@@ -119,6 +140,29 @@ export default function GroupChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+
+  const fetchGroupDetails = async () => {
+    try {
+      const response = await groupService.getGroupDetails(groupId);
+      if (response.success && response.data) {
+        setIsAdmin(response.data.group.user_is_admin || response.data.group.user_is_owner);
+        setGroupName(response.data.group.group_name);
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch group details:', error);
+    }
+  };
+
+  const fetchMembers = async () => {
+    try {
+      const response = await groupService.getGroupMembers(groupId);
+      if (response.success && response.data) {
+        setMembers(response.data.members);
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch members:', error);
+    }
+  };
 
   const fetchPolls = async () => {
     try {
@@ -304,17 +348,44 @@ return (
     </header>
 
     <main className="flex-1 max-w-5xl mx-auto w-full p-4">
-      <div className="mb-4 flex gap-2">
-        <button
-          onClick={() => setShowCreatePoll(!showCreatePoll)}
-          className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white font-mono font-bold border-2 border-neutral-900 dark:border-neutral-100 hover:bg-blue-700 transition-colors"
-        >
-          {showCreatePoll ? 'HIDE POLL' : '+ POLL'}
-        </button>
-      </div>
+      {/* Admin Controls */}
+      {isAdmin && (
+        <div className="mb-4 flex gap-2 items-center">
+          <button
+            onClick={() => setShowCreatePoll(!showCreatePoll)}
+            className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white font-mono font-bold border-2 border-neutral-900 dark:border-neutral-100 hover:bg-blue-700 transition-colors"
+          >
+            {showCreatePoll ? 'HIDE POLL' : '📊 CREATE POLL'}
+          </button>
+          <Link
+            href={`/groups/${groupId}/manage`}
+            className="px-4 py-2 bg-neutral-600 dark:bg-neutral-500 text-white font-mono font-bold border-2 border-neutral-900 dark:border-neutral-100 hover:bg-neutral-700 transition-colors"
+          >
+            ⚙️ MANAGE
+          </Link>
+          <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">[ADMIN]</span>
+        </div>
+      )}
 
-      {/* Create Poll Form */}
-      {showCreatePoll && <QuickPollForm groupId={groupId} onSuccess={() => { setShowCreatePoll(false); fetchPolls(); }} />}
+      {/* Create Poll Modal */}
+      {showCreatePoll && isAdmin && (() => {
+        const userStr = localStorage.getItem('user');
+        const currentUserId = userStr ? JSON.parse(userStr).user_id : '';
+        
+        return (
+          <CreateRemovalPoll
+            groupId={groupId}
+            members={members}
+            currentUserId={currentUserId}
+            onCancel={() => setShowCreatePoll(false)}
+            onSuccess={() => {
+              setShowCreatePoll(false);
+              fetchPolls();
+              toast.success('Poll created successfully!');
+            }}
+          />
+        );
+      })()}
 
       {/* Active Polls Section */}
       <div className="bg-white dark:bg-black border-4 border-neutral-900 dark:border-neutral-100 p-4 mb-4">
@@ -364,8 +435,6 @@ return (
                 </span>
                 <span className="text-red-700 dark:text-red-300">AGAINST: {poll.votes_against}</span>
               </div>
-              
-            {showCreatePoll && <QuickPollForm groupId={groupId} onSuccess={() => { setShowCreatePoll(false); fetchPolls(); }} />}
 
             {/* Vote Buttons */}
             {poll.status === 'active' && (
@@ -510,74 +579,5 @@ return (
         </form>
       </main>
     </div>
-  );
-}
-
-// Quick Poll Form Component
-function QuickPollForm({ groupId, onSuccess }: { groupId: string; onSuccess: () => void }) {
-  const toast = useToast();
-  const [formData, setFormData] = useState({
-    poll_type: 'kick_member',
-    title: '',
-    expires_in_hours: 24
-  });
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await groupService.createPoll(groupId, formData);
-      onSuccess();
-      setFormData({ poll_type: 'kick_member', title: '', expires_in_hours: 24 });
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create poll');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="bg-blue-50 dark:bg-blue-950 border-2 border-blue-600 dark:border-blue-400 p-3 mb-4">
-      <h3 className="font-bold text-neutral-900 dark:text-neutral-100 font-mono text-sm mb-3">CREATE POLL</h3>
-      <div className="space-y-2">
-        <input
-          type="text"
-          required
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-          placeholder="Poll question..."
-          className="w-full px-3 py-2 border border-neutral-900 dark:border-neutral-100 bg-white dark:bg-black text-neutral-900 dark:text-neutral-100 font-mono text-sm focus:outline-none"
-        />
-        <div className="flex gap-2">
-          <select
-            value={formData.poll_type}
-            onChange={(e) => setFormData({ ...formData, poll_type: e.target.value })}
-            className="flex-1 px-3 py-2 border border-neutral-900 dark:border-neutral-100 bg-white dark:bg-black text-neutral-900 dark:text-neutral-100 font-mono text-sm"
-          >
-            <option value="kick_member">Kick Member</option>
-            <option value="make_admin">Make Admin</option>
-            <option value="remove_admin">Remove Admin</option>
-            <option value="change_group_name">Change Name</option>
-          </select>
-          <input
-            type="number"
-            min={1}
-            max={168}
-            value={formData.expires_in_hours}
-            onChange={(e) => setFormData({ ...formData, expires_in_hours: parseInt(e.target.value) })}
-            className="w-20 px-3 py-2 border border-neutral-900 dark:border-neutral-100 bg-white dark:bg-black text-neutral-900 dark:text-neutral-100 font-mono text-sm"
-            placeholder="hrs"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white font-mono font-bold border border-neutral-900 dark:border-neutral-100 hover:bg-blue-700 disabled:opacity-50 text-sm"
-          >
-            {loading ? '...' : 'POST'}
-          </button>
-        </div>
-      </div>
-    </form>
   );
 }

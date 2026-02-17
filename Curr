@@ -1,297 +1,239 @@
-# 1️⃣ AUTHENTICATION MODULE
 
-## Signup
-
-* Validate inputs
-* Roll number format check
-* Username uniqueness check
-* Hash password
-* Generate OTP
-* Send OTP email
-* Verify OTP
-* Create user
-* Issue access token
-* Issue refresh token
-* Create session
-
-## Login
-
-* Validate credentials
-* Check account active
-* Compare password hash
-* Update last_seen
-* Issue access token
-* Issue refresh token
-* Create session entry
-* Log auth event
-
-## Logout
-
-* Revoke refresh token
-* Delete session
-
-## Password Reset
-
-* Request reset OTP
-* Verify OTP
-* Set new password
-* Revoke all sessions
-
-## Token Management
-
-* Access token validation
-* Refresh token validation
-* Token rotation
-* Token revocation
-
----
-
-# 2️⃣ USER MANAGEMENT MODULE
-
-## Profile
-
-* Get self profile
-* Get public profile
-* Update username
-* Update display picture
-* Update settings
-
-## Account Control
-
-* Soft delete account
-* Reactivate account (optional)
-* Update last_seen
-
-## User Search
-
-* Search by username
-* Search by roll number
-* Search by branch
-
----
-
-# 3️⃣ USER SETTINGS MODULE
-
-* Theme mode
-* Email notifications toggle
-* Push notifications toggle
-* Profile visibility
-* Show online status toggle
-* Show last_seen toggle
-* Update bio
-
----
-
-# 4️⃣ BLOCK SYSTEM MODULE
-
-* Block user
-* Unblock user
-* Check block relation
-* Prevent 1v1 messaging
-* Prevent chat creation if blocked
-
----
-
-# 5️⃣ CHAT CORE MODULE
-
-## Conversation Creation
-
-* Create 1v1 conversation
-* Create group conversation
-* Validate participants
-
-## Membership Management
-
-* Add member
-* Remove member
-* Leave conversation
-* Check membership
-* Auto admin reassignment
-
----
-
-# 6️⃣ 1v1 CHAT MODULE
-
-## Messaging
-
-* Send encrypted message
-* Validate sender authorization
-* Store ciphertext
-* Emit real-time message
-* Create message receipt
-
-## Message States
-
-* Sent status
-* Delivered status
-* Read status
-
-## History
-
-* Fetch conversation history
-* Pagination support
-
-## Message Actions
-
-* Delete for me
-* Delete for all (soft delete)
-* Retry send (client-triggered)
-
----
-
-# 7️⃣ GROUP CHAT MODULE
-
-## Group Creation
-
-* Public group
-* Private group
-* Assign creator admin
-
-## Admin Controls
-
-* Promote admin
-* Demote admin
-* Remove member (private only)
-
-## Public Group Governance
-
-* Create removal poll
-* Vote on poll
-* Enforce poll result
-* Poll cooldown (24h)
-
-## Group Messaging
-
-* Broadcast message
-* Receipt creation for members
-
----
-
-# 8️⃣ INVITATION MODULE (PRIVATE GROUP)
-
-* Generate invite token
-* Validate token
-* Join via token
-* Expire invite
-* Invalidate invite after use
-
----
-
-# 9️⃣ MESSAGE MODULE
-
-## Message Types
-
-* Text
-* Emoji
-* Image URL
-
-## Message Storage
-
-* Encrypted payload
-* Encryption metadata
-* Sender reference
-* Conversation reference
-
-## Message Lifecycle
-
-* Create
-* Deliver
-* Read
-* Soft delete
-
----
-
-# 🔟 REAL-TIME SOCKET MODULE
-
-## Connection
-
-* JWT verification
-* Bind socket → user
-
-## Events
-
-* Join conversation
-* Leave conversation
-* Send message
-* Receive message
-* Message delivered
-* Message read
-* Typing start
-* Typing stop
-* Disconnect handling
-
----
-
-# 1️⃣1️⃣ REPORT & MODERATION MODULE
-
-* Report user
-* Store report metadata
-* Count unique reporters
-* Auto-block after threshold (5+)
-* Notify admin via email
-
----
-
-# 1️⃣2️⃣ MEDIA MODULE
-
-* Upload image
-* Validate file type
-* Generate URL
-* Attach to message
-* Delete unused media (optional)
-
----
-
-# 1️⃣3️⃣ AUDIT & LOGGING MODULE
-
-* Auth logs
-* Profile changes
-* Block/unblock logs
-* Report events
-* Security anomalies
-
----
-
-# 1️⃣4️⃣ SECURITY MODULE
-
-* Rate limiting
-* OTP attempt limiting
-* IP tracking
-* Session validation
-* Account lock handling
-* Input validation
-
----
-
-# 1️⃣5️⃣ SYSTEM RULES MODULE (INVARIANTS)
-
-* Only members send messages
-* Only admins manage private group members
-* Public group removal via poll only
-* Deleted users cannot login
-* Blocked users cannot 1v1 chat
-* Server cannot decrypt messages
-
----
-
-# 1️⃣6️⃣ OPTIONAL BUT SMART (Small Future Modules)
-
-* Presence (Redis online state)
-* Typing indicators
-* Unread message counters
-* Conversation pinning
-* Muted conversations
-
----
-
-# FINAL BUILD ORDER (Best Implementation Sequence)
-
-1. Auth
-2. User Management
-3. Conversations + Membership
-4. 1v1 Messaging
-5. Socket events
-6. Group system
-7. Reports & block
-8. Media handling
-9. Governance (polls)
+======================================================================
+
+## **REDIS DATA STRUCTURES**
+
+### **Session & Auth**
+1. **session:{sessionId}** - User session data (TTL: 7 days) ✅ **PRIMARY SESSION STORE**
+2. **user_sessions:{userId}** - Set of active session IDs for a user
+3. **rate_limit:{userId}:{endpoint}:{minute}** - API rate limiting counters
+4. **session_cache:{userId}:{chatId}**: Cached decrypted AES keys (TTL: 1 hour)
+
+### **Real-time & Presence**
+5. **online_users** - Set of currently online user IDs
+6. **user_socket:{userId}** → socketId - Mapping user to WebSocket connection
+7. **socket_user:{socketId}** → userId - Reverse mapping
+8. **room:{chatId}** - Set of socket IDs in a chat room
+9. **typing:{chatId}:{userId}** - Typing indicators with TTL (5 seconds)
+
+### **Message Queue & Caching**
+10. **offline_messages:{userId}** - List of messages for offline users
+11. **unread_counts:{userId}:{chatId}** - Counter of unread messages per chat
+12. **message_cache:{chatId}:recent** - Cached recent messages (LRU, 50 messages)
+13. **user_presence:{userId}** - Last seen timestamp + status
+
+### **Notifications**
+14. **notifications:{userId}** - List of pending notifications
+15. **notification_count:{userId}** - Unread notification counter
+
+### **Poll & Voting Cache**
+16. **poll_live:{pollId}** - Live vote counts for active polls (Hash)
+17. **user_voted:{pollId}** - Set of users who already voted
+
+### **Anonymous Identity Cache**
+18. **anon_map:{randomString}** → userId - Quick lookup of anonymous IDs
+19. **user_anon:{userId}:{targetId}** → randomString - Reverse mapping
+20. **anon_cache:{userId}:{chatId}**: Cached anonymous identity for active chats
+
+### **Rate Limiting & Security**
+21. **login_attempts:{ip}:{hour}** - Failed login attempts counter (TTL: 1hrs)
+22. **email_otp:{email}** - OTP codes with expiry (TTL: 10 minutes)
+23. **blocked_ips:{ip}** - Temporarily blocked IPs (TTL: 24 hours)
+24. **ws_auth:{socketId}** - WebSocket authentication token (TTL: 30 secs)
+
+### **Encryption Key Cache**
+25. **key_cache:{userId}:{chatId}**-Recently decrypted AES keys (TTL:5 mins)
+26. **key_version:{chatId}** - Current encryption key version
+
+### **Search & Discovery**
+27. **user_search_index** - Searchable user data for quick lookups
+28. **group_search_index** - Searchable group data
+
+### **System Health**
+29. **ws_connections** - Count of active WebSocket connections
+30. **message_throughput:{second}** - Messages per second (TTL: 60 secs)
+
+
+Session & Auth (String type)
+    Key format: session:{sessionId}
+    Value: JSON string with user data
+    {
+    "userId": "uuid",
+    "rollNo": "B23XX",
+    "createdAt": "timestamp",
+    "expiresAt": "timestamp",
+    "device": "web/mobile"
+    }
+    TTL: 7 days
+
+    Key: user_sessions:{userId}
+    Value: Set of active session IDs
+    Used for: Logout all sessions
+
+    Key: rate_limit:{userId}:{endpoint}:{minute}
+    Value: Integer counter
+    TTL: 60 seconds
+    Used: Rate limiting per minute
+
+    // Key: session_cache:{userId}:{chatId}
+    // Type: String (encrypted AES key)
+    // TTL: 1 hour
+    // Value: {aesKey: "encrypted", keyVersion: 1, lastUsed: timestamp}
+    // Used: Cache decrypted chat keys
+
+
+Real-time & Presence (Sets/Hashes)
+    // Key: online_users
+    // Type: Set of user IDs
+    // Used for: Quick online status check
+    // TTL: Persistent (cleaned on disconnect)
+
+    // Key: user_socket:{userId}
+    // Type: String (socket.id)
+    // Used for: Send message to specific user
+    // TTL: Session duration
+
+    // Key: socket_user:{socketId}
+    // Type: String (userId)
+    // Reverse mapping for disconnect cleanup
+    // TTL: Session duration
+
+    // Key: room:{chatId} or room:group:{groupId}
+    // Type: Set of socket IDs
+    // Used for: Broadcasting to chat room
+    // TTL: Session duration
+
+    // Key: typing:{chatId}:{userId}
+    // Type: String (timestamp)
+    // TTL: 5 seconds
+    // Used for: Typing indicators
+
+
+Message Queue & Caching
+    // Key: offline_messages:{userId}
+    // Type: List of message JSON
+    // Max length: 100 messages
+    // Used for: Store messages when user offline
+
+    // Key: unread_counts:{userId}:{chatId}
+    // Type: Integer counter
+    // Used for: Badge counts
+
+    // Key: message_cache:{chatId}:recent
+    // Type: List (LRU capped at 50 messages)
+    // Value: JSON of recent messages
+    // TTL: 1 hour
+    // Used for: Quick load of recent chat
+
+    // Key: user_presence:{userId}
+    // Type: Hash
+    // Value: {status: "online/away/offline", lastSeen: timestamp}
+    // TTL: 30 days
+
+Notifications (Lists/Sorted Sets)
+    // Key: notifications:{userId}
+    // Type: List of notification JSON
+    // Max length: 50
+    // Used for: In-app notifications
+    // TTL: 7 days -- will this work?
+
+    // Key: notification_count:{userId}
+    // Type: Integer
+    // TTL: 7 days
+    // Used: Unread badge
+
+
+Poll & Voting Cache
+    // Key: poll_live:{pollId}
+    // Type: Hash
+    // Value: {votesFor: 0, votesAgainst: 0, totalVoters: 0}
+    // TTL: 6 hours (poll duration)
+    // Used for: Live vote updates
+
+    // Key: user_voted:{pollId}
+    // Type: Set of user IDs
+    // TTL: 6 hours
+    // Used for: Prevent double voting
+
+
+Anonymous Identity Cache
+    // Key: anon_map:{randomString}
+    // Type: String (userId)
+    // TTL: 30 days
+    // Used for: Quick anonymous ID resolution
+
+    // Key: user_anon:{userId}:{targetId}
+    // Type: String (randomString)
+    // TTL: 30 days
+    // Used for: Reverse lookup
+
+    // Key: anon_cache:{userId}:{chatId}
+    // Type: String (anonymousIdentityId)
+    // TTL: 1 hour
+    // Used: Cache active anonymous identity
+
+Encryption Key Cache
+    // Key: key_cache:{userId}:{chatId}
+    // Type: String (decrypted AES key)
+    // TTL: 5 minutes
+    // Used: Frequently accessed chat keys
+
+    // Key: key_version:{chatId}
+    // Type: Integer
+    // TTL: 30 days
+    // Used: Current encryption key version
+
+
+Rate Limiting & Security
+    // Key: login_attempts:{ip}:{hour}
+    // Type: Integer counter
+    // TTL: 1 hour
+    // Used for: Brute force protection
+
+    // Key: email_otp:{email}
+    // Type: String (OTP code)
+    // TTL: 10 minutes
+    // Used for: Email verification
+
+    // Key: blocked_ips:{ip}
+    // Type: String (block reason)
+    // TTL: 24 hours
+    // Used for: Temporary IP bans
+
+    // Key: ws_auth:{socketId}
+    // Type: String (JSON)
+    // TTL: 30 seconds
+    // Value: {userId, sessionToken, authenticatedAt}
+    // Used: WebSocket authentication
+
+
+Search & Discovery (Sorted Sets)
+    // Key: user_search_index
+    // Type: Sorted Set
+    // Score: timestamp
+    // Member: user:{userId}:{rollNo}:{name}
+    // Used for: Quick user search
+
+    // Key: group_search_index
+    // Type: Sorted Set
+    // Score: member count
+    // Member: group:{groupId}:{name}
+    // Used for: Group discovery
+
+System Health
+    // Key: ws_connections
+    // Type: Integer
+    // Used for: Monitoring active connections
+
+    // Key: message_throughput:{second}
+    // Type: Integer
+    // TTL: 60 seconds
+    // Used for: Performance monitoring
+
+    -- See if below works or not
+    // Key: active_polls
+    // Type: Set of poll IDs
+    // Used for: Quick poll status check
+
+
+===========================================================================

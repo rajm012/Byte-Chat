@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
+import { connectRedis, disconnectRedis } from './lib/redis.js';
 import authRoutes from './routes/auth.routes.js';
 import testRoutes from './routes/test.routes.js';
 import profileRoutes from './routes/profile.routes.js';
@@ -80,11 +81,43 @@ export const io = initializeSocket(httpServer);
 // Start server
 const PORT = config.server.port;
 
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📝 Environment: ${config.server.nodeEnv}`);
-  console.log(`🌐 Frontend URL: ${config.cors.frontendUrl}`);
-  console.log(`⚡ Socket.io initialized`);
+const startServer = async () => {
+  try {
+    // Connect to Redis
+    await connectRedis();
+    console.log('✅ Redis connected');
+
+    httpServer.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📝 Environment: ${config.server.nodeEnv}`);
+      console.log(`🌐 Frontend URL: ${config.cors.frontendUrl}`);
+      console.log(`⚡ Socket.io initialized`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  await disconnectRedis();
+  httpServer.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
 });
+
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 SIGTERM received, shutting down...');
+  await disconnectRedis();
+  httpServer.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+startServer();
 
 export default app;

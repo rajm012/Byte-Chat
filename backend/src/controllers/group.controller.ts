@@ -975,7 +975,15 @@ export const promoteMemberToAdmin = async (req: Request, res: Response) => {
 // Create a poll (admins only)
 export const createPoll = async (req: Request, res: Response) => {
   const { groupId } = req.params;
-  const { poll_type, title, description, target_user_id, expires_in_hours = 24 } = req.body;
+  const { 
+    poll_type, 
+    title, 
+    description, 
+    target_user_id, 
+    expires_in_hours = 24,
+    parent_poll_id,
+    objection_reason 
+  } = req.body;
   const userId = req.user?.userId;
 
   if (!userId) {
@@ -983,13 +991,28 @@ export const createPoll = async (req: Request, res: Response) => {
   }
 
   // Validate poll type
-  const validPollTypes = ['kick_member', 'make_admin', 'remove_admin', 'change_group_name', 'object_removal'];
+  const validPollTypes = ['remove_user', 'kick_member', 'make_admin', 'remove_admin', 'change_group_name', 'object_removal'];
   if (!validPollTypes.includes(poll_type)) {
     throw new ApiError(400, 'Invalid poll type');
   }
 
   if (!title || title.trim().length === 0) {
     throw new ApiError(400, 'Poll title is required');
+  }
+
+  // Validate target_user_id for polls that need it
+  if (['remove_user', 'kick_member', 'make_admin', 'remove_admin', 'object_removal'].includes(poll_type) && !target_user_id) {
+    throw new ApiError(400, `Target user is required for ${poll_type} polls`);
+  }
+
+  // Validate expires_in_hours
+  if (expires_in_hours < 1 || expires_in_hours > 168) { // Max 1 week
+    throw new ApiError(400, 'Poll duration must be between 1 and 168 hours');
+  }
+
+  // Validate objection_reason for object_removal polls
+  if (poll_type === 'object_removal' && !objection_reason) {
+    throw new ApiError(400, 'Objection reason is required for object_removal polls');
   }
 
   const client = await pool.connect();
@@ -1012,23 +1035,23 @@ export const createPoll = async (req: Request, res: Response) => {
       throw new ApiError(403, 'Only admins can create polls');
     }
 
-    // Get total member count for votes_required calculation
-    const memberCountResult = await client.query(
-      `SELECT COUNT(*) as count FROM group_members WHERE group_id = $1`,
-      [groupId]
-    );
-    const memberCount = parseInt(memberCountResult.rows[0].count);
-    const votesRequired = Math.ceil(memberCount / 2); // Majority
-
     // Calculate expiration time
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + expires_in_hours);
 
     // Create the poll
+    // Note: votes_required is NULL - decision made when poll expires based on simple majority
     const pollResult = await client.query(
       `INSERT INTO polls (
-        group_id, created_by, target_user_id, poll_type, title, description,
-        votes_required, total_voters, expires_at
+        group_id, 
+        created_by, 
+        target_user_id, 
+        poll_type, 
+        title, 
+        description,
+        expires_at,
+        parent_poll_id,
+        objection_reason
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
@@ -1038,9 +1061,9 @@ export const createPoll = async (req: Request, res: Response) => {
         poll_type,
         title.trim(),
         description?.trim() || null,
-        votesRequired,
-        memberCount,
-        expiresAt
+        expiresAt,
+        parent_poll_id || null,
+        objection_reason?.trim() || null
       ]
     );
 
@@ -1085,6 +1108,10 @@ export const getGroupPolls = async (req: Request, res: Response) => {
     if (memberCheck.rows.length === 0) {
       throw new ApiError(403, 'You are not a member of this group');
     }
+
+    // Auto-expire any polls that have passed their deadline
+    // This triggers the manage_poll_lifecycle function which decides winners based on votes
+    await query(`SELECT * FROM check_and_expire_polls()`);
 
     // Get polls with creator info and user's vote status
     let queryText = `
@@ -1150,6 +1177,9 @@ export const voteOnPoll = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
 
+    // Auto-expire any polls that have passed their deadline
+    await client.query(`SELECT * FROM check_and_expire_polls()`);
+
     // Check if user is a member of the group
     const memberCheck = await client.query(
       `SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2`,
@@ -1209,7 +1239,7 @@ export const voteOnPoll = async (req: Request, res: Response) => {
       `SELECT 
         COUNT(*) FILTER (WHERE vote_value = true) as votes_for,
         COUNT(*) FILTER (WHERE vote_value = false) as votes_against,
-        COUNT(*) as total_voters
+        COUNT(DISTINCT user_id) as total_voters
        FROM votes 
        WHERE poll_id = $1`,
       [pollId]
@@ -1217,27 +1247,16 @@ export const voteOnPoll = async (req: Request, res: Response) => {
 
     const stats = voteStatsResult.rows[0];
 
-    // Get votes_required from poll
-    const pollDetailsResult = await client.query(
-      `SELECT votes_required FROM polls WHERE poll_id = $1`,
-      [pollId]
-    );
-    const votesRequired = pollDetailsResult.rows[0].votes_required;
-
-    // Determine if poll should be marked as passed/failed
-    let newStatus = 'active';
-    if (parseInt(stats.votes_for) >= votesRequired) {
-      newStatus = 'passed';
-    } else if (parseInt(stats.votes_against) >= votesRequired) {
-      newStatus = 'failed';
-    }
-
-    // Update poll with new statistics and status
+    // Update poll with vote statistics only
+    // Status will be determined when poll expires (by database trigger)
     await client.query(
       `UPDATE polls 
-       SET votes_for = $1, votes_against = $2, total_voters = $3, status = $4, updated_at = NOW()
-       WHERE poll_id = $5`,
-      [stats.votes_for, stats.votes_against, stats.total_voters, newStatus, pollId]
+       SET votes_for = $1, 
+           votes_against = $2, 
+           total_voters = $3, 
+           updated_at = NOW()
+       WHERE poll_id = $4`,
+      [stats.votes_for, stats.votes_against, stats.total_voters, pollId]
     );
 
     await client.query('COMMIT');

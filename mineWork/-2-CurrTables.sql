@@ -4571,6 +4571,139 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
+-- ==================================================================================
+-- MIGRATION: Add automatic user removal for 'remove_user' polls
+-- Run this on your database to enable automatic removal when polls execute
+-- ==================================================================================
+
+-- Update the poll lifecycle management function
+CREATE OR REPLACE FUNCTION manage_poll_lifecycle()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_system_notifications_exists BOOLEAN;
+    v_group_bans_exists BOOLEAN;
+BEGIN
+    -- Check for expired polls
+    IF NEW.status = 'active' AND NEW.expires_at <= NOW() THEN
+        NEW.status := 'expired';
+        NEW.updated_at := NOW();
+    END IF;
+    
+    -- Execute passed polls
+    IF NEW.status = 'passed' AND OLD.status != 'passed' AND NEW.is_executed = FALSE THEN
+        -- Execute based on poll type
+        CASE NEW.poll_type
+            WHEN 'remove_user' THEN
+                -- Remove user from group (without banning)
+                DELETE FROM group_members 
+                WHERE group_id = NEW.group_id 
+                AND user_id = NEW.target_user_id;
+            
+            WHEN 'kick_member' THEN
+                -- Remove user from group
+                DELETE FROM group_members 
+                WHERE group_id = NEW.group_id 
+                AND user_id = NEW.target_user_id;
+                
+                -- Add to bans table if exists
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'group_bans'
+                ) INTO v_group_bans_exists;
+                
+                IF v_group_bans_exists THEN
+                    INSERT INTO group_bans (group_id, user_id, banned_by, reason)
+                    VALUES (NEW.group_id, NEW.target_user_id, NEW.created_by, 
+                           'Removed by poll vote: ' || COALESCE(NEW.description, 'No reason provided'));
+                END IF;
+            
+            WHEN 'make_admin' THEN
+                -- Make user admin
+                UPDATE group_members 
+                SET is_admin = TRUE,
+                    can_add_members = TRUE,
+                    can_remove_members = TRUE,
+                    can_edit_group = TRUE
+                WHERE group_id = NEW.group_id 
+                AND user_id = NEW.target_user_id;
+            
+            WHEN 'remove_admin' THEN
+                -- Remove admin privileges
+                UPDATE group_members 
+                SET is_admin = FALSE,
+                    can_add_members = FALSE,
+                    can_remove_members = FALSE,
+                    can_edit_group = FALSE
+                WHERE group_id = NEW.group_id 
+                AND user_id = NEW.target_user_id;
+            
+            WHEN 'object_removal' THEN
+                -- Re-add user if they were removed
+                INSERT INTO group_members (group_id, user_id, joined_at)
+                VALUES (NEW.group_id, NEW.target_user_id, NOW())
+                ON CONFLICT (group_id, user_id) 
+                DO UPDATE SET 
+                    is_admin = FALSE,
+                    joined_at = NOW();
+            
+            -- Add more cases as needed
+        END CASE;
+        
+        -- Mark as executed
+        NEW.is_executed := TRUE;
+        NEW.executed_at := NOW();
+        
+        -- Check if system_notifications exists
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = 'system_notifications'
+        ) INTO v_system_notifications_exists;
+        
+        IF v_system_notifications_exists AND NEW.target_user_id IS NOT NULL THEN
+            -- Create notification for affected user
+            INSERT INTO system_notifications (user_id, notification_type, title, body, data)
+            VALUES (
+                NEW.target_user_id,
+                'vote_result',
+                'Poll Result: ' || NEW.title,
+                CASE NEW.poll_type
+                    WHEN 'remove_user' THEN 'You have been removed from the group by poll vote.'
+                    WHEN 'kick_member' THEN 'You have been removed and banned from the group by poll vote.'
+                    WHEN 'make_admin' THEN 'You have been promoted to admin by poll vote.'
+                    WHEN 'remove_admin' THEN 'Your admin privileges have been removed by poll vote.'
+                    WHEN 'object_removal' THEN 'Your objection was successful. You have been re-added to the group.'
+                    ELSE 'A poll affecting you has been completed.'
+                END,
+                jsonb_build_object(
+                    'poll_id', NEW.poll_id,
+                    'group_id', NEW.group_id,
+                    'poll_type', NEW.poll_type,
+                    'result', 'passed',
+                    'executed_at', NOW()
+                )
+            );
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 
+-- Drop the old constraint
+ALTER TABLE polls DROP CONSTRAINT IF EXISTS polls_poll_type_check;
+
+-- Add the new constraint with 'remove_user' included
+ALTER TABLE polls 
+ADD CONSTRAINT polls_poll_type_check 
+CHECK (poll_type IN (
+    'remove_user',      -- Remove member (no ban, can rejoin)
+    'kick_member',      -- Kick member (with ban, cannot rejoin easily)
+    'make_admin',       -- Promote to admin
+    'remove_admin',     -- Demote from admin
+    'change_group_name', -- Change group name
+    'object_removal'    -- Appeal/object to a removal poll
+));
 
