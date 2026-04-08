@@ -9,18 +9,9 @@ import { resetUnread } from '../services/unread.service.js';
 import { getUserProfileCached, getUserGenderCached } from '../services/userProfileCache.service.js';
 import { queueOfflineMessage } from '../services/offlineMessage.service.js';
 import { isUserOnline } from '../socket/index.js';
-import {
-  buildMessageDedupeToken,
-  completeMessageDedupToken,
-  getEncryptedSessionKeyCached,
-  reserveMessageDedupToken,
-} from '../services/messageDeliveryOptimization.service.js';
+import {buildMessageDedupeToken, completeMessageDedupToken, getEncryptedSessionKeyCached, 
+  reserveMessageDedupToken,} from '../services/messageDeliveryOptimization.service.js';
 
-/**
- * ANONYMOUS CHAT CONTROLLER
- * Handles all anonymous chat operations
- * Separated from regular chat for better modularity and debugging
- */
 
 // Create anonymous conversation
 export async function createAnonymousConversation(req: Request, res: Response) {
@@ -147,13 +138,6 @@ export async function createAnonymousConversation(req: Request, res: Response) {
       // console.log(`✓ Found existing anonymous conversation: ${conversation.rows[0].conversation_id}`);
     }
 
-    // console.log(`✅ Anonymous conversation created/retrieved:`, {
-    //   conversationId: conversation.rows[0].conversation_id,
-    //   anonymousInitiatorId: anonymousIdentityId,
-    //   user1Id,
-    //   user2Id
-    // });
-
     res.status(200).json({
       success: true,
       data: {
@@ -180,7 +164,6 @@ export async function createAnonymousConversation(req: Request, res: Response) {
 export async function getAnonymousConversations(req: Request, res: Response) {
   try {
     const userId = req.user?.userId;
-
     if (!userId) {
       throw new ApiError(401, 'Unauthorized');
     }
@@ -326,11 +309,6 @@ export async function getAnonymousMessages(req: Request, res: Response) {
           is_anonymous: true,
           identity_id: anonIdentity.rows[0].identity_id
         };
-        // console.log(`🎭 Receiver viewing anonymous sender:`, {
-        //   anonString: anonIdentity.rows[0].random_string,
-        //   gender: anonIdentity.rows[0].display_gender,
-        //   anonymousInitiatorId: conversation.anonymous_initiator_id
-        // });
       } else {
         // Initiator (sender) sees real profile
         const otherUserInfo = await getUserProfileCached(String(otherUserId));
@@ -345,10 +323,6 @@ export async function getAnonymousMessages(req: Request, res: Response) {
           dp_url: otherUserInfo.dp_url,
           is_anonymous: false
         };
-        // console.log(`🎭 Sender viewing receiver (real profile):`, {
-        //   name: otherUserInfo.rows[0].name,
-        //   roll_no: otherUserInfo.rows[0].roll_no
-        // });
       }
     }
 
@@ -805,7 +779,7 @@ export async function revealAnonymousIdentity(req: Request, res: Response) {
       targetConversationId = existingConvCheck.rows[0].conversation_id;
       shouldMerge = true;
 
-      console.log(`[CAUTION] Merging anonymous conversation ${conversationId} into existing normal conversation ${targetConversationId}`);
+      // console.log(`[CAUTION] Merging anonymous conversation ${conversationId} into existing normal conversation ${targetConversationId}`);
 
       // Mark all anonymous messages with the merge flag and move them
       await pool.query(
@@ -826,7 +800,7 @@ export async function revealAnonymousIdentity(req: Request, res: Response) {
       targetConversationId = conversationId;
       shouldMerge = false;
 
-      console.log(`[CAUTION] Converting anonymous conversation ${conversationId} to normal conversation`);
+      // console.log(`[CAUTION] Converting anonymous conversation ${conversationId} to normal conversation`);
 
       // Mark all messages as previously anonymous
       await pool.query(

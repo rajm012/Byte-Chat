@@ -157,7 +157,7 @@ export async function unblockUser(req: Request, res: Response) {
           canMessageNow: true,
           unblockedBy: userId
         });
-        console.log(`🔓 Conversation ${conversationId} unblocked - notified both users`);
+        // console.log(`🔓 Conversation ${conversationId} unblocked - notified both users`);
       }
     } else {
       // Blocks still exist - update who is blocking
@@ -435,31 +435,6 @@ export async function reportGroup(req: Request, res: Response) {
       [userId, reportedGroupId, reportType, description, evidenceUrls || []]
     );
 
-    // // Comprehensive logging for admin review
-    // console.log('✅ ====== GROUP REPORT CREATED ======');
-    // console.log('Report ID:', result.rows[0].report_id);
-    // console.log('\n📋 REPORTER INFO:');
-    // console.log('  - User ID:', reporterInfo.rows[0].user_id);
-    // console.log('  - Name:', reporterInfo.rows[0].name);
-    // console.log('  - Roll No:', reporterInfo.rows[0].roll_no);
-    // console.log('  - Branch:', reporterInfo.rows[0].branch);
-    // if (groupInfo.rows.length > 0) {
-    //   console.log('\n🚨 REPORTED GROUP INFO:');
-    //   console.log('  - Group ID:', groupInfo.rows[0].group_id);
-    //   console.log('  - Group Name:', groupInfo.rows[0].group_name);
-    //   console.log('  - Description:', groupInfo.rows[0].group_desc || 'None');
-    //   console.log('  - Is Public:', groupInfo.rows[0].is_public);
-    //   console.log('  - Max Members:', groupInfo.rows[0].max_members);
-    //   console.log('  - Created By:', groupInfo.rows[0].creator_name, `(${groupInfo.rows[0].creator_roll})`);
-    // }
-    // console.log('\n📝 REPORT DETAILS:');
-    // console.log('  - Type:', reportType);
-    // console.log('  - Description:', description);
-    // console.log('  - Evidence URLs:', evidenceUrls?.length || 0, 'items');
-    // console.log('  - Status:', result.rows[0].status);
-    // console.log('  - Created At:', result.rows[0].created_at);
-    // console.log('================================\n');
-
     res.status(201).json({
       success: true,
       message: 'Report submitted successfully. Our team will review it shortly.',
@@ -543,24 +518,6 @@ export async function getMyReports(req: Request, res: Response) {
       [userId]
     );
 
-    // Log comprehensive report list for review
-    // console.log(`📋 User ${userId} retrieved ${result.rows.length} reports`);
-    // result.rows.forEach((report, index) => {
-    //   console.log(`\n=== Report #${index + 1} (ID: ${report.report_id}) ===`);
-    //   // console.log('Type:', report.report_type);
-    //   // console.log('Status:', report.status);
-    //   // console.log('Created:', report.created_at);
-    //   if (report.reported_user) {
-    //     console.log('Reported User:', report.reported_user.name, `(${report.reported_user.roll_no})`);
-    //   }
-    //   if (report.reported_group) {
-    //     console.log('Reported Group:', report.reported_group.group_name);
-    //   }
-    //   if (report.reported_message) {
-    //     console.log('Reported Message ID:', report.reported_message.message_id);
-    //   }
-    // });
-
     res.json({
       success: true,
       data: result.rows
@@ -621,9 +578,8 @@ export async function getAllReports(req: Request, res: Response) {
       throw new ApiError(401, 'Unauthorized');
     }
 
-    // TODO: Add admin check here when you implement admin roles
     // For now, we'll allow it but log it
-    console.log(`[ALERT]  User ${userId} is accessing all reports - ensure this is an admin`);
+    // console.log(`[ALERT]  User ${userId} is accessing all reports - ensure this is an admin`);
 
     let query = `
       SELECT 
@@ -713,38 +669,6 @@ export async function getAllReports(req: Request, res: Response) {
     params.push(limit, offset);
 
     const result = await pool.query(query, params);
-
-    // // Comprehensive logging for admin console
-    // console.log(`\n📊 ====== ALL REPORTS RETRIEVED ======`);
-    // console.log(`Total Reports: ${result.rows.length}`);
-    // console.log(`Filter - Status: ${status || 'all'}, Type: ${reportType || 'all'}`);
-    // console.log(`Limit: ${limit}, Offset: ${offset}\n`);
-
-    // result.rows.forEach((report, index) => {
-    //   console.log(`\n--- Report #${index + 1} ---`);
-    //   console.log(`ID: ${report.report_id}`);
-    //   console.log(`Type: ${report.report_type} | Status: ${report.status}`);
-    //   console.log(`Reporter: ${report.reporter_info.name} (${report.reporter_info.roll_no})`);
-    //   if (report.reported_user) {
-    //     console.log(`Reported User: ${report.reported_user.name} (${report.reported_user.roll_no})`);
-    //     console.log(`  Branch: ${report.reported_user.branch}`);
-    //     console.log(`  Gender: ${report.reported_user.gender}`);
-    //   }
-    //   if (report.reported_group) {
-    //     console.log(`Reported Group: ${report.reported_group.group_name}`);
-    //   }
-    //   if (report.reported_message) {
-    //     console.log(`Message ID: ${report.reported_message.message_id}`);
-    //     console.log(`Conversation: ${report.reported_message.conversation_id}`);
-    //   }
-    //   console.log(`Created: ${report.created_at}`);
-    //   if (report.resolved_at) {
-    //     console.log(`Resolved: ${report.resolved_at} by ${report.resolver_info?.name}`);
-    //   }
-    //   console.log(`Description:\n${report.description.substring(0, 200)}${report.description.length > 200 ? '...' : ''}`);
-    // });
-    // console.log(`\n====================================\n`);
-
     res.json({
       success: true,
       data: {

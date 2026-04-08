@@ -1,42 +1,25 @@
 import type { Request, Response } from 'express';
-import * as crypto from 'crypto';
 import { pool } from '../lib/db.js';
 import { ApiError } from '../utils/error.util.js';
 import { io } from '../index.js';
-import { emitToConversation, isUserOnline } from '../socket/index.js';
+import { emitToConversation } from '../socket/index.js';
 import { uploadToCloudinary } from '../utils/cloudinary.util.js';
-import { cacheMessage } from '../services/messageCache.service.js';
-import { queueOfflineMessage } from '../services/offlineMessage.service.js';
-import { incrementUnread, resetUnread } from '../services/unread.service.js';
 import { isUserOnline as isOnlineRedis } from '../services/presence.service.js';
-import { pushNotification } from '../services/notification.service.js';
-import { cacheKeys, CACHE_TTL_SECONDS, getCacheJSON, setCacheJSON } from '../utils/cache.util.js';
+import { cacheKeys, CACHE_TTL_SECONDS, setCacheJSON } from '../utils/cache.util.js';
 import { getUserProfileCached } from '../services/userProfileCache.service.js';
-import { sendConditionalJson } from '../utils/httpCache.util.js';
 import { getEitherBlockedStatusCached, setEitherBlockedStatusCached } from '../services/blockCache.service.js';
-import {
-  buildMessageDedupeToken,
-  completeMessageDedupToken,
-  getEncryptedSessionKeyCached,
-  primeEncryptedSessionKeyCache,
-  reserveMessageDedupToken,
-} from '../services/messageDeliveryOptimization.service.js';
-import {
-  buildMessagesPageCacheKey,
-  bumpMessagesCacheVersion,
-  getCachedMessagesPage,
-  getMessagesCacheVersion,
-  setCachedMessagesPage,
-} from '../services/messagePaginationCache.service.js';
+import { buildMessagesPageCacheKey, bumpMessagesCacheVersion, getCachedMessagesPage, 
+  setCachedMessagesPage } from '../services/messagePaginationCache.service.js';
+import { handleGetOrCreateConversation, handleGetConversations } from '../services/chat/conversation.service.js';
+import { handleGetMessages, handleUpdateMessageStatus } from '../services/chat/message-read.service.js';
+import { handleSendMessage } from '../services/chat/message-send.service.js';
+import { handleGetParticipantPublicKeys, handleStoreSessionKeys } from '../services/chat/session-keys.service.js';
 
 /**
  * REGULAR CHAT CONTROLLER
  * Handles all regular (non-anonymous) chat operations
  * For anonymous chat, see anonymous-chat.controller.ts
  */
-
-const CONVERSATION_LIST_CACHE_METRIC = 'conversation_list';
-
 function cursorToString(value: unknown): string | null {
   if (value instanceof Date) {
     return value.toISOString();
@@ -282,113 +265,7 @@ async function isEitherUserBlocked(userA: string, userB: string): Promise<boolea
 
 // Get or create regular conversation (non-anonymous only)
 export async function getOrCreateConversation(req: Request, res: Response) {
-  try {
-    const userId = req.user?.userId;
-    const { otherUserId } = req.body;
-
-    if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    if (!otherUserId) {
-      throw new ApiError(400, 'Other user ID is required');
-    }
-
-    // Check if user is trying to message themselves
-    if (userId === otherUserId) {
-      throw new ApiError(400, 'Cannot message yourself');
-    }
-
-    // Check if users are blocked
-    const isBlocked = await isEitherUserBlocked(String(userId), String(otherUserId));
-    if (isBlocked) {
-      throw new ApiError(403, 'Cannot message this user');
-    }
-
-    // Ensure consistent ordering for conversation lookup
-    const user1Id = userId < otherUserId ? userId : otherUserId;
-    const user2Id = userId < otherUserId ? otherUserId : userId;
-
-    // console.log(`💬 Creating/finding regular conversation between User ${userId} and User ${otherUserId}`);
-
-    let conversationCreated = false;
-
-    // Check for existing regular conversation (no anonymous initiator)
-    let conversation = await pool.query(
-      `SELECT * FROM chat_conversations 
-       WHERE user1_id = $1 AND user2_id = $2 AND anonymous_initiator_id IS NULL`,
-      [user1Id, user2Id]
-    );
-
-    // If conversation doesn't exist, create it
-    if (!conversation || conversation.rows.length === 0) {
-      // console.log(`📝 Creating NEW regular conversation`);
-
-      try {
-        // Create new regular conversation
-        conversation = await pool.query(
-          `INSERT INTO chat_conversations (
-            user1_id, user2_id, is_anonymous, anonymous_initiator_id, is_accepted
-          ) VALUES ($1, $2, false, NULL, true) RETURNING *`,
-          [user1Id, user2Id]
-        );
-        conversationCreated = true;
-
-        // console.log(`✅ NEW regular conversation created: ${conversation.rows[0].conversation_id}`);
-      }
-      catch (insertError: any) {
-        // Handle race condition - another request created it first
-        if (insertError.code === '23505') {
-          // console.log(`⚠️ Race condition detected - fetching existing regular conversation`);
-
-          // Fetch the conversation that was just created by the other request
-          conversation = await pool.query(
-            `SELECT * FROM chat_conversations 
-             WHERE user1_id = $1 AND user2_id = $2 AND anonymous_initiator_id IS NULL`,
-            [user1Id, user2Id]
-          );
-
-          // console.log(`✓ Fetched conversation after race condition: ${conversation.rows[0]?.conversation_id}`);
-        }
-        else {
-          // Re-throw if it's not a duplicate key error
-          throw insertError;
-        }
-      }
-    }
-    else {
-      // console.log(`✓ Found existing regular conversation: ${conversation.rows[0].conversation_id}`);
-    }
-
-    // console.log(`✅ Regular conversation created/retrieved:`, {
-    //   conversationId: conversation.rows[0].conversation_id,
-    //   user1Id,
-    //   user2Id
-    // });
-
-    if (conversationCreated) {
-      await warmRegularConversationCacheForUsers([String(userId), String(otherUserId)]);
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        conversationId: conversation.rows[0].conversation_id
-      }
-    });
-  }
-  catch (error: any) {
-    console.error('[ERROR] Get or create regular conversation error:', {
-      message: error.message,
-      code: error.code,
-      detail: error.detail,
-      userId: req.user?.userId,
-      otherUserId: req.body?.otherUserId
-    });
-
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(500, 'Failed to create regular conversation');
-  }
+  return handleGetOrCreateConversation(req, res);
 }
 
 // Legacy function for backward compatibility
@@ -544,599 +421,31 @@ export async function respondToChatRequest(req: Request, res: Response) {
 
 // Get all regular conversations for a user (excluding anonymous)
 export async function getConversations(req: Request, res: Response) {
-  try {
-    const userId = req.user?.userId;
-
-    if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    const conversationsCacheKey = cacheKeys.userConversations(String(userId));
-    const cachedConversations = await getCacheJSON<Array<Record<string, unknown>>>(
-      conversationsCacheKey,
-      CONVERSATION_LIST_CACHE_METRIC
-    );
-
-    if (cachedConversations) {
-      return sendConditionalJson(req, res, {
-        success: true,
-        data: cachedConversations
-      }, {
-        maxAgeSeconds: 15,
-        cacheStatus: 'HIT'
-      });
-    }
-
-    const rows = await fetchRegularConversationsFromDb(String(userId));
-
-    await setCacheJSON(
-      conversationsCacheKey,
-      rows,
-      CACHE_TTL_SECONDS.USER_CONVERSATIONS
-    );
-
-    // console.log(`[MSGES] Fetched ${result.rows.length} regular conversations for user ${userId}`);
-
-    return sendConditionalJson(req, res, {
-      success: true,
-      data: rows
-    }, {
-      maxAgeSeconds: 15,
-      cacheStatus: 'MISS'
-    });
-  }
-  catch (error) {
-    console.error('[ERROR] Get regular conversations error:', error);
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(500, 'Failed to fetch regular conversations');
-  }
+  return handleGetConversations(req, res);
 }
 
 // Get messages for a regular conversation (non-anonymous)
 export async function getMessages(req: Request, res: Response) {
-  try {
-    const userId = req.user?.userId;
-    const { conversationId } = req.params;
-    const { limit = 50, before, q, prefetchNext = '1' } = req.query;
-
-    if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    // Check if user is part of regular conversation
-    const convCheck = await pool.query(
-      `SELECT * FROM chat_conversations 
-       WHERE conversation_id = $1 
-       AND (user1_id = $2 OR user2_id = $2)
-       AND (is_anonymous = false OR is_anonymous IS NULL)
-       AND anonymous_initiator_id IS NULL`,
-      [conversationId, userId]
-    );
-
-    if (convCheck.rows.length === 0) {
-      // console.log('[DEBUG] getMessages 403 - user not in regular conversation:', { conversationId, userId });
-      throw new ApiError(403, 'Access denied to this conversation');
-    }
-
-    const conversation = convCheck.rows[0];
-
-    // Get other user info (always show real profile in regular chats)
-    const otherUserId = conversation.user1_id === userId ? conversation.user2_id : conversation.user1_id;
-
-    const otherUserInfo = await getUserProfileCached(String(otherUserId));
-    if (!otherUserInfo) {
-      throw new ApiError(404, 'Other user not found');
-    }
-
-    const otherUserData = {
-      user_id: otherUserInfo.user_id,
-      name: otherUserInfo.name,
-      roll_no: otherUserInfo.roll_no,
-      gender: otherUserInfo.gender,
-      dp_url: otherUserInfo.dp_url,
-      is_anonymous: false
-    };
-
-    // console.log(`💬 Regular chat - both see real profiles:`, {
-    //   name: otherUserInfo.rows[0].name,
-    //   roll_no: otherUserInfo.rows[0].roll_no
-    // });
-
-    const parsedLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
-    const searchQuery = typeof q === 'string' ? q.trim() : '';
-    const beforeCursor = typeof before === 'string' && before.trim().length > 0 ? before.trim() : null;
-
-    const cacheVersion = await getMessagesCacheVersion(String(conversationId));
-    const cacheKey = buildMessagesPageCacheKey({
-      conversationId: String(conversationId),
-      userId: String(userId),
-      limit: parsedLimit,
-      before: beforeCursor,
-      searchQuery,
-      version: cacheVersion,
-    });
-
-    let pagePayload = await getCachedMessagesPage(cacheKey);
-
-    if (!pagePayload) {
-      const rowsDesc = await fetchRegularMessagesPage({
-        conversationId: String(conversationId),
-        userId: String(userId),
-        limit: parsedLimit,
-        before: beforeCursor,
-        searchQuery,
-      });
-
-      const hasMore = rowsDesc.length === parsedLimit;
-      const oldestRow = rowsDesc[rowsDesc.length - 1];
-      const nextCursor = hasMore ? cursorToString(oldestRow?.created_at) : null;
-
-      pagePayload = {
-        messages: [...rowsDesc].reverse(),
-        hasMore,
-        nextCursor,
-      };
-
-      await setCachedMessagesPage(cacheKey, pagePayload);
-    }
-
-    if (!beforeCursor && searchQuery.length === 0) {
-      // Mark all incoming messages in this conversation as read for current user only on latest-page reads.
-      await pool.query(
-        `UPDATE message_status ms
-         SET status = 'read', read_at = NOW()
-         FROM chat_messages cm
-         WHERE ms.message_id = cm.message_id
-           AND ms.user_id = $1
-           AND cm.conversation_id = $2
-           AND cm.sender_id != $1
-           AND ms.status != 'read'`,
-        [userId, conversationId]
-      );
-
-      // Redis Messaging Layer
-      // 1. Reset unread count for this user in this chat
-      await resetUnread(userId, conversationId as string);
-      await warmRegularConversationCacheForUsers([String(userId)]);
-    }
-
-    const shouldPrecacheNext = String(prefetchNext) !== '0' && String(prefetchNext).toLowerCase() !== 'false';
-    if (shouldPrecacheNext && pagePayload.hasMore && pagePayload.nextCursor) {
-      void preCacheNextMessagesPage({
-        conversationId: String(conversationId),
-        userId: String(userId),
-        limit: parsedLimit,
-        searchQuery,
-        nextCursor: pagePayload.nextCursor,
-        version: cacheVersion,
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        conversation: conversation,
-        messages: pagePayload.messages,
-        hasMore: pagePayload.hasMore,
-        nextCursor: pagePayload.nextCursor,
-        otherUser: otherUserData
-      }
-    });
-  } catch (error) {
-    // Don't log 403 errors as errors - they're expected when checking if conversation is anonymous
-    if (error instanceof ApiError && error.statusCode === 403) {
-      // Silent - this is expected when frontend checks regular vs anonymous
-    } else {
-      console.error('[ERROR] Get regular messages error:', error);
-    }
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(500, 'Failed to fetch regular messages');
-  }
+  return handleGetMessages(req, res);
 }
 
 // Send a regular message (non-anonymous)
 export async function sendMessage(req: Request, res: Response) {
-  try {
-    const userId = req.user?.userId;
-    const {
-      conversationId,
-      encryptedContent,
-      contentIv,
-      contentAuthTag,
-      messageType = 'text',
-      mediaUrl,
-      mediaSize,
-      mediaMimeType,
-      thumbnailUrl,
-      keyId,
-      parentMessageId,
-      clientMessageId
-    } = req.body;
-
-    if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    if (!conversationId || !encryptedContent || !contentIv || !contentAuthTag) {
-      throw new ApiError(400, 'Missing required fields');
-    }
-
-    // Check if user is part of regular conversation
-    const convCheck = await pool.query(
-      `SELECT * FROM chat_conversations 
-       WHERE conversation_id = $1 
-       AND (user1_id = $2 OR user2_id = $2)
-       AND is_blocked = false
-       AND (is_anonymous = false OR is_anonymous IS NULL)
-       AND anonymous_initiator_id IS NULL`,
-      [conversationId, userId]
-    );
-
-    if (convCheck.rows.length === 0) {
-      throw new ApiError(403, 'Access denied or conversation blocked/not regular');
-    }
-
-    // Get other user ID and check blocking status
-    const conv = convCheck.rows[0];
-    const otherUserId = conv.user1_id === userId ? conv.user2_id : conv.user1_id;
-
-    const isBlocked = await isEitherUserBlocked(String(userId), String(otherUserId));
-    if (isBlocked) {
-      throw new ApiError(403, 'Cannot send message - user is blocked');
-    }
-
-    const dedupeInput: {
-      scope: string;
-      senderId: string;
-      encryptedContent: string;
-      contentIv: string;
-      contentAuthTag: string;
-      clientMessageId?: string;
-      parentMessageId?: string;
-      messageType?: string;
-    } = {
-      scope: `conversation:${conversationId}`,
-      senderId: String(userId),
-      encryptedContent: String(encryptedContent),
-      contentIv: String(contentIv),
-      contentAuthTag: String(contentAuthTag),
-    };
-
-    if (typeof clientMessageId === 'string' && clientMessageId.length > 0) {
-      dedupeInput.clientMessageId = clientMessageId;
-    }
-    if (parentMessageId) {
-      dedupeInput.parentMessageId = String(parentMessageId);
-    }
-    if (typeof messageType === 'string' && messageType.length > 0) {
-      dedupeInput.messageType = messageType;
-    }
-
-    const dedupeToken = buildMessageDedupeToken(dedupeInput);
-
-    const dedupeState = await reserveMessageDedupToken(dedupeToken);
-    if (!dedupeState.reserved && dedupeState.existingMessageId) {
-      const existing = await pool.query(
-        'SELECT * FROM chat_messages WHERE message_id = $1',
-        [dedupeState.existingMessageId]
-      );
-
-      if (existing.rows.length > 0) {
-        return res.status(200).json({
-          success: true,
-          message: 'Duplicate message ignored',
-          duplicate: true,
-          data: existing.rows[0]
-        });
-      }
-    }
-
-    // Insert message
-    const result = await pool.query(
-      `INSERT INTO chat_messages (
-        conversation_id,
-        sender_id,
-        message_type,
-        encrypted_content,
-        content_iv,
-        content_auth_tag,
-        media_url,
-        media_size,
-        media_mime_type,
-        thumbnail_url,
-        is_anonymous,
-        anonymous_identity_id,
-        key_id,
-        parent_message_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, NULL, $11, $12)
-      RETURNING *`,
-      [
-        conversationId,
-        userId,
-        messageType,
-        encryptedContent,
-        contentIv,
-        contentAuthTag,
-        mediaUrl,
-        mediaSize,
-        mediaMimeType,
-        thumbnailUrl,
-        keyId, // Using keyId from request (session_key_id)
-        parentMessageId || null
-      ]
-    );
-
-    const message = result.rows[0];
-    await completeMessageDedupToken(dedupeToken, String(message.message_id));
-
-    // Update conversation last_message_at
-    await pool.query(
-      'UPDATE chat_conversations SET last_message_at = NOW() WHERE conversation_id = $1',
-      [conversationId]
-    );
-
-    await bumpMessagesCacheVersion(String(conversationId));
-
-    await warmRegularConversationCacheForUsers([String(userId), String(otherUserId)]);
-
-    // Emit socket event with real sender info
-    if (io) {
-      const userInfo = await getUserProfileCached(String(userId));
-      if (!userInfo) {
-        throw new ApiError(404, 'Sender not found');
-      }
-
-      const senderInfo = {
-        user_id: userId,
-        name: userInfo.name,
-        display_gender: userInfo.gender,
-        dp_url: userInfo.dp_url,
-        is_anonymous: false,
-      };
-
-      // Fetch full message with parent info for socket emission
-      const fullMessageResult = await pool.query(
-        `SELECT 
-          cm.*,
-          CASE
-            WHEN cm.parent_message_id IS NOT NULL THEN jsonb_build_object(
-              'message_id', pm.message_id,
-              'encrypted_content', pm.encrypted_content,
-              'content_iv', pm.content_iv,
-              'content_auth_tag', pm.content_auth_tag,
-              'sender', jsonb_build_object(
-                'name', pu.name
-              )
-            )
-            ELSE null
-          END as parent_message,
-          NULL::text as user_session_key
-        FROM chat_messages cm
-        LEFT JOIN chat_messages pm ON cm.parent_message_id = pm.message_id
-        LEFT JOIN users pu ON pm.sender_id = pu.user_id
-        WHERE cm.message_id = $1`,
-        [message.message_id]
-      );
-
-      const recipientSessionKey = keyId
-        ? await getEncryptedSessionKeyCached(String(keyId), String(otherUserId), async () => {
-          const keyResult = await pool.query(
-            `SELECT aes_key_encrypted
-             FROM chat_session_keys
-             WHERE session_key_id = $1 AND encrypted_for_user_id = $2
-             LIMIT 1`,
-            [keyId, otherUserId]
-          );
-
-          return keyResult.rows[0]?.aes_key_encrypted ?? null;
-        })
-        : null;
-
-      emitToConversation(io, conversationId, 'new-message', {
-        ...fullMessageResult.rows[0],
-        user_session_key: recipientSessionKey,
-        sender: senderInfo,
-        is_my_message: false,
-      });
-    }
-
-    // Redis Messaging Layer
-    const fullMessage = message; // Basic message object from DB insert
-
-    // 1. Cache the message for quick loading
-    await cacheMessage(conversationId, fullMessage);
-
-    // 2. Track unread count for recipient
-    await incrementUnread(otherUserId, conversationId);
-
-    // 3. Queue for offline delivery if needed
-    const online = await isUserOnline(otherUserId);
-    if (!online) {
-      await queueOfflineMessage(otherUserId, fullMessage, dedupeToken);
-    }
-
-    // 4. Push a notification entry so it appears in Notification Center
-    await pushNotification(otherUserId, {
-      type: 'new_message',
-      conversationId,
-      message: 'You received a new message',
-      senderId: userId,
-      messageType,
-      timestamp: Date.now(),
-    });
-
-    // console.log(`💬 Regular message sent in conversation ${conversationId}`);
-
-    res.status(201).json({
-      success: true,
-      message: 'Message sent successfully',
-      data: message
-    });
-  }
-  catch (error) {
-    console.error('[MSGES] Send regular message error:', error);
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(500, 'Failed to send regular message');
-  }
+  return handleSendMessage(req, res);
 }
 
 // Get public keys of all participants in a conversation
 export async function getParticipantPublicKeys(req: Request, res: Response) {
-  try {
-    const userId = req.user?.userId;
-    const { conversationId } = req.params;
-
-    if (!userId) throw new ApiError(401, 'Unauthorized');
-
-    // Check if user is part of conversation and get type
-    const convCheck = await pool.query(
-      `SELECT user1_id, user2_id, is_anonymous FROM chat_conversations 
-       WHERE conversation_id = $1 AND (user1_id = $2 OR user2_id = $2)`,
-      [conversationId, userId]
-    );
-
-    if (convCheck.rows.length === 0) {
-      throw new ApiError(403, 'Access denied to this conversation');
-    }
-
-    const { user1_id, user2_id, is_anonymous } = convCheck.rows[0];
-
-      const cacheKey = cacheKeys.conversationPublicKeys(String(conversationId));
-      let participants = await getCacheJSON<Array<Record<string, unknown>>>(cacheKey);
-
-      if (!participants) {
-        const result = await pool.query(
-          `SELECT uek.user_id, uek.public_key, u.name
-           FROM user_encryption_keys uek
-           JOIN users u ON uek.user_id = u.user_id
-           JOIN chat_conversations cc ON uek.user_id = cc.user1_id OR uek.user_id = cc.user2_id
-           WHERE cc.conversation_id = $1`,
-          [conversationId]
-        );
-        participants = result.rows;
-        await setCacheJSON(cacheKey, participants, CACHE_TTL_SECONDS.USER_PUBLIC_KEYS);
-      }
-
-    res.json({
-      success: true,
-      data: {
-          participants,
-        isAnonymous: !!is_anonymous
-      }
-    });
-  } catch (error) {
-    console.error('[E2EE] Get participant public keys error:', error);
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(500, 'Failed to fetch public keys');
-  }
+  return handleGetParticipantPublicKeys(req, res);
 }
 
 // Store encrypted session keys for participants
 export async function storeSessionKeys(req: Request, res: Response) {
-  try {
-    const userId = req.user?.userId;
-    const { conversationId, groupId, keys } = req.body;
-    // keys: Array<{ userId: string, encryptedKey: string, keyVersion: number }>
-
-    if (!userId) throw new ApiError(401, 'Unauthorized');
-    if (!keys || !Array.isArray(keys) || keys.length === 0) {
-      throw new ApiError(400, 'Keys array is required');
-    }
-
-    // Logic: Insert multiple rows into chat_session_keys/group_session_keys
-    // For simplicity, we use chat_session_keys for both but set group_id if applicable.
-
-    // Generate a common ID for this session key setup (so they can be referenced by one key_id)
-    const sessionKeyGroupId = crypto.randomUUID();
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      for (const k of keys) {
-        await client.query(
-          `INSERT INTO chat_session_keys (
-            session_key_id, conversation_id, group_id, 
-            aes_key_encrypted, aes_key_iv,
-            encrypted_for_user_id, encrypted_with_key_version
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [
-            sessionKeyGroupId,
-            conversationId || null,
-            groupId || null,
-            k.encryptedKey,
-            k.aesKeyIv || null,
-            k.userId,
-            k.keyVersion || 1
-          ]
-        );
-
-        await primeEncryptedSessionKeyCache(
-          String(sessionKeyGroupId),
-          String(k.userId),
-          String(k.encryptedKey)
-        );
-      }
-
-      await client.query('COMMIT');
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally {
-      client.release();
-    }
-
-    res.status(201).json({
-      success: true,
-      data: {
-        keyId: sessionKeyGroupId
-      }
-    });
-  } catch (error) {
-    console.error('[E2EE] Store session keys error:', error);
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(500, 'Failed to store session keys');
-  }
+  return handleStoreSessionKeys(req, res);
 }
+
 export async function updateMessageStatus(req: Request, res: Response) {
-  try {
-    const userId = req.user?.userId;
-    const { messageId } = req.params;
-    const { status } = req.body; // 'delivered' or 'read'
-
-    if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
-    }
-
-    if (!status || !['delivered', 'read'].includes(status)) {
-      throw new ApiError(400, 'Invalid status');
-    }
-
-    // Update message status
-    const result = await pool.query(
-      `UPDATE message_status 
-       SET status = $1,
-           ${status === 'delivered' ? 'delivered_at = NOW()' : 'read_at = NOW()'}
-       WHERE message_id = $2 AND user_id = $3
-       RETURNING *`,
-      [status, messageId, userId]
-    );
-
-    if (result.rows.length === 0) {
-      throw new ApiError(404, 'Message status not found');
-    }
-
-    res.json({
-      success: true,
-      message: 'Message status updated',
-      data: result.rows[0]
-    });
-  }
-  catch (error) {
-    console.error('[ERROR] Update message status error:', error);
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(500, 'Failed to update message status');
-  }
+  return handleUpdateMessageStatus(req, res);
 }
 
 // Delete a message
@@ -1367,15 +676,6 @@ export async function reportUser(req: Request, res: Response) {
     // Use description if provided, otherwise use reason (backwards compatibility)
     const finalDescription = description || reason || 'No description provided';
 
-    // // Debug log to help troubleshoot
-    // console.log('📝 Report request received:', { 
-    //   reportedUserId, 
-    //   finalReportType, 
-    //   hasDescription: !!finalDescription,
-    //   messageId,
-    //   conversationId 
-    // });
-
     if (!reportedUserId) {
       throw new ApiError(400, 'Reported user ID is required');
     }
@@ -1421,17 +721,6 @@ export async function reportUser(req: Request, res: Response) {
       throw new ApiError(400, 'Report type or reason is required');
     }
 
-    // // Debug: Extract and compare IDs
-    // console.log('🔍 Checking self-report:', {
-    //   reporterUserId: userId,
-    //   reporterType: typeof userId,
-    // reportedUserId: actualReportedUserId,
-    //   reportedType: typeof actualReportedUserId,
-    //   areEqual: userId === actualReportedUserId,
-    //   strictEqual: userId === actualReportedUserId,
-    //   looseEqual: userId == actualReportedUserId
-    // });
-
     // Prevent self-reporting (ensure both are strings for comparison)
     const reporterIdStr = String(userId);
     const reportedIdStr = String(actualReportedUserId);
@@ -1440,8 +729,6 @@ export async function reportUser(req: Request, res: Response) {
       console.log('[ERROR] Self-report detected!');
       throw new ApiError(400, 'Cannot report yourself');
     }
-
-    // console.log('✅ Different users - report allowed');
 
     // Validate and normalize report type
     const validTypes = ['spam', 'harassment', 'inappropriate_content', 'impersonating', 'fake_profile', 'other'];
@@ -1521,44 +808,6 @@ export async function reportUser(req: Request, res: Response) {
       ]
     );
 
-    // // Comprehensive logging for admin review
-    // console.log('✅ ====== REPORT CREATED ====== ');
-    // console.log('Report ID:', result.rows[0].report_id);
-    // console.log('\n📋 REPORTER INFO:');
-    // console.log('  - User ID:', reporterInfo.rows[0].user_id);
-    // console.log('  - Name:', reporterInfo.rows[0].name);
-    // console.log('  - Roll No:', reporterInfo.rows[0].roll_no);
-    // console.log('  - Branch:', reporterInfo.rows[0].branch);
-    // console.log('  - DP URL:', reporterInfo.rows[0].dp_url || 'None');
-    // console.log('\n🚨 REPORTED USER INFO:');
-    // console.log('  - User ID:', reportedInfo.rows[0].user_id);
-    // console.log('  - Name:', reportedInfo.rows[0].name);
-    // console.log('  - Roll No:', reportedInfo.rows[0].roll_no);
-    // console.log('  - Gender:', reportedInfo.rows[0].gender);
-    // console.log('  - Branch:', reportedInfo.rows[0].branch);
-    // console.log('  - DP URL:', reportedInfo.rows[0].dp_url || 'None');
-    // console.log('  - Bio:', reportedInfo.rows[0].bio || 'None');
-    // console.log('\n📝 REPORT DETAILS:');
-    // console.log('  - Type:', normalizedType);
-    // console.log('  - Description:', finalDescription);
-    // console.log('  - Evidence URLs:', evidenceUrls?.length || 0, 'items');
-    // console.log('  - Status:', result.rows[0].status);
-    // console.log('  - Created At:', result.rows[0].created_at);
-
-    // if (messageDetails) {
-    //   console.log('\n💬 MESSAGE CONTEXT:');
-    //   console.log('  - Message ID:', messageDetails.message_id);
-    //   console.log('  - Conversation ID:', messageDetails.conversation_id);
-    //   console.log('  - Message Type:', messageDetails.message_type);
-    //   console.log('  - Sent At:', messageDetails.created_at);
-    // }
-
-    // if (conversationId) {
-    //   console.log('\n🔗 CONVERSATION ID:', conversationId);
-    // }
-
-    // console.log('================================\n');
-
     res.json({
       success: true,
       message: 'Report submitted successfully. Our team will review it.',
@@ -1566,7 +815,6 @@ export async function reportUser(req: Request, res: Response) {
         reportId: result.rows[0].report_id
       }
     });
-
   }
 
   catch (error) {

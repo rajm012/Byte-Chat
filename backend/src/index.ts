@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import type { Express, Request, Response } from 'express';
 import { createServer } from 'http';
 import { timingSafeEqual } from 'crypto';
@@ -7,12 +8,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
-import {
-  getDbFailoverState,
-  getDbPoolMetrics,
-  pool,
-  startDbPoolMonitor,
-} from './lib/db.js';
+import {getDbFailoverState, getDbPoolMetrics, pool, startDbPoolMonitor} from './lib/db.js';
 import authRoutes from './routes/auth.routes.js';
 import testRoutes from './routes/test.routes.js';
 import profileRoutes from './routes/profile.routes.js';
@@ -29,6 +25,7 @@ import { initializeSocket } from './socket/index.js';
 import { clearPollCache } from './services/pollCache.service.js';
 import { startCacheMetricsLogger } from './utils/cache.util.js';
 import { getAuthCacheMetrics } from './services/authCache.service.js';
+import { startRegularMessagePostCommitWorker } from './services/chat/message-post-commit-queue.service.js';
 
 // Redis connection
 import { connectRedis, redis } from './lib/redis.js';
@@ -49,11 +46,9 @@ const DB_POOL_DEBUG_PASSWORD = requireEnv('DB_POOL_DEBUG_PASSWORD');
 function isDebugPasswordValid(candidate: string): boolean {
   const expectedBuffer = Buffer.from(DB_POOL_DEBUG_PASSWORD);
   const candidateBuffer = Buffer.from(candidate);
-
   if (expectedBuffer.length !== candidateBuffer.length) {
     return false;
   }
-
   return timingSafeEqual(expectedBuffer, candidateBuffer);
 }
 
@@ -70,10 +65,7 @@ function truncateString(value: string, maxLength = 500): string {
   return `${value.slice(0, maxLength)}...<truncated>`;
 }
 
-async function getRedisValuePreview(
-  key: string,
-  keyType: string,
-  includeFullValues: boolean,
+async function getRedisValuePreview(key: string, keyType: string, includeFullValues: boolean,
 ): Promise<{ valuePreview: unknown; isTruncated: boolean }> {
   switch (keyType) {
     case 'string': {
@@ -131,10 +123,7 @@ async function getRedisValuePreview(
   }
 }
 
-async function buildRedisSnapshot(
-  pattern: string,
-  limit: number,
-  includeFullValues: boolean,
+async function buildRedisSnapshot(pattern: string, limit: number, includeFullValues: boolean,
 ): Promise<{ entries: RedisSnapshotEntry[]; isCapped: boolean }> {
   let cursor = '0';
   const discovered = new Set<string>();
@@ -201,6 +190,26 @@ app.get('/redis-test', async (req: Request, res: Response) => {
   }
 });
 
+
+// HTTP compression (skip binary/media types)
+app.use(compression({
+  filter: (req: Request, res: Response) => {
+    // Skip compression for already-compressed or binary responses
+    const type = res.getHeader('Content-Type');
+    if (typeof type === 'string' && (
+      type.startsWith('image/') ||
+      type.startsWith('audio/') ||
+      type.startsWith('video/') ||
+      type === 'application/zip' ||
+      type === 'application/gzip' ||
+      type === 'application/octet-stream'
+    )) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
+
 // Security middleware
 app.use(helmet());
 
@@ -211,19 +220,29 @@ app.use(cors({
 }));
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // Increased to 500 requests per windowMs for chat functionality
+
+// Global rate limiter (broad, but skips message endpoints)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for message polling (still applies globally)
+    // Skip rate limiting for message polling (still applies per-route below)
     return req.path.includes('/messages') && req.method === 'GET';
   }
 });
+app.use(globalLimiter);
 
-app.use(limiter);
+// Dedicated message endpoint limiter (stricter)
+const messageLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute per IP
+  message: 'Too many message requests, slow down.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Body parsers
 app.use(express.json());
@@ -239,11 +258,28 @@ app.use('/api/test', testRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/anonymous', anonymousRoutes);
 app.use('/api/settings', settingsRoutes);
+
+// Attach messageLimiter to all message-related endpoints
+// (imports moved below for per-route limiter)
+
+// Chat message endpoints
+app.use('/api/chat/conversation/:conversationId/messages', messageLimiter);
+app.use('/api/chat/send', messageLimiter);
+app.use('/api/chat/message/:messageId/status', messageLimiter);
+app.use('/api/chat/message/:messageId', messageLimiter);
+
+// Group message endpoints
+app.use('/api/groups/:groupId/messages', messageLimiter);
+app.use('/api/groups/:groupId/messages', messageLimiter);
+
+// Message management endpoints (reactions, edits, deletes)
+app.use('/api/messages', messageLimiter, messageManagementRoutes);
+
+// Other chat/group routes
 app.use('/api/chat', chatRoutes);
 app.use('/api/anonymous-chat', anonymousChatRoutes); // Separate anonymous chat routes
 app.use('/api/groups', groupRoutes); // Group routes
 app.use('/api/moderation', blockReportRoutes); // Block and report routes
-app.use('/api/messages', messageManagementRoutes); // Message management routes
 app.use('/api/notifications', notificationRoutes); // Notifications
 
 // Health check
@@ -360,6 +396,7 @@ app.use(errorHandler);
 
 // Initialize Socket.io
 export const io = initializeSocket(httpServer);
+startRegularMessagePostCommitWorker();
 
 // Start server
 const PORT = config.server.port;

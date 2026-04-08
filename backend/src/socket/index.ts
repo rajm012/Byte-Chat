@@ -3,6 +3,7 @@ import type { Server as HTTPServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { config } from '../config/index.js';
+import { query } from '../lib/db.js';
 import { redis } from '../lib/redis.js';
 import { getSession } from '../services/session.service.js';
 import { storeWsAuth, getWsAuth, deleteWsAuth } from '../services/wsAuth.service.js';
@@ -128,9 +129,30 @@ async function emitToTrackedRoom(chatId: string, roomName: string, event: string
   fallbackRoomEmit(roomName, event, data, excludeSocketId);
 }
 
+async function getPresenceTargetIds(userId: string): Promise<{ conversationIds: string[]; groupIds: string[] }> {
+  const [conversationResult, groupResult] = await Promise.all([
+    query(
+      `SELECT conversation_id
+       FROM chat_conversations
+       WHERE user1_id = $1 OR user2_id = $1`,
+      [userId]
+    ),
+    query(
+      `SELECT group_id
+       FROM group_members
+       WHERE user_id = $1`,
+      [userId]
+    ),
+  ]);
+
+  return {
+    conversationIds: conversationResult.rows.map((row: { conversation_id: string }) => String(row.conversation_id)),
+    groupIds: groupResult.rows.map((row: { group_id: string }) => String(row.group_id)),
+  };
+}
+
 export function initializeSocket(httpServer: HTTPServer) {
   maybeStartSocketMetricsLogger();
-
   const io = new SocketServer(httpServer, {
     cors: {
       origin: config.cors.frontendUrl,
@@ -165,7 +187,6 @@ export function initializeSocket(httpServer: HTTPServer) {
             sessionId: sessionId,
             authenticatedAt: Date.now()
           });
-
           return next();
         }
       }
@@ -180,7 +201,6 @@ export function initializeSocket(httpServer: HTTPServer) {
           userId: decoded.userId,
           authenticatedAt: Date.now()
         });
-
         return next();
       }
 
@@ -198,12 +218,23 @@ export function initializeSocket(httpServer: HTTPServer) {
     const userId = socket.data.userId;
     // console.log(`User ${userId} connected with socket ${socket.id}`);
 
-    // Track user's socket connections in Redis
+    // Track user's socket connections in Redis and add global online presence
     await mapUserSocket(userId, socket.id);
-
-    // Add to global online presence and notify all clients
     await addOnlineUser(userId);
-    io.emit('user-online', { userId });
+
+    try {
+      const { conversationIds, groupIds } = await getPresenceTargetIds(userId);
+
+      // Emit user-online only to relevant rooms
+      for (const convId of conversationIds) {
+        void emitToTrackedRoom(convId, `conversation:${convId}`, 'user-online', { userId });
+      }
+      for (const groupId of groupIds) {
+        void emitToTrackedRoom(groupId, `group:${groupId}`, 'user-online', { userId });
+      }
+    } catch (e) {
+      console.error('[Socket] Failed to fetch presence targets for online emit:', e);
+    }
 
     // Deliver offline messages
     const offlineMessages = await getOfflineMessages(userId);
@@ -259,7 +290,6 @@ export function initializeSocket(httpServer: HTTPServer) {
       let chatId = '';
       let chatType: 'conversation' | 'group' = 'conversation';
       let isUserTyping = true;
-
       if (typeof payload === 'string') {
         chatId = payload;
       } else if (payload && typeof payload === 'object') {
@@ -293,7 +323,6 @@ export function initializeSocket(httpServer: HTTPServer) {
     socket.on('message-read', async ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
       const auth = await getWsAuth(socket.id);
       if (!auth) return socket.emit('error', 'Unauthenticated socket');
-
       socket.to(`conversation:${conversationId}`).emit('message-status-updated', {
         messageId,
         status: 'read',
@@ -312,16 +341,11 @@ export function initializeSocket(httpServer: HTTPServer) {
       //   console.log(`Socket ${socket.id} left chat room ${chatId}`);
     });
 
-
-
     // Handle disconnection
     socket.on('disconnect', async () => {
       // console.log(`User ${userId} disconnected from socket ${socket.id}`);
-
-      // Clean up Redis rooms
+      // Clean up Redis rooms and routing
       await removeSocketFromAllRooms(socket.id);
-
-      // Clean up Redis routing
       await removeSocketMapping(socket.id);
 
       // Check if user has any other active connections
@@ -329,14 +353,26 @@ export function initializeSocket(httpServer: HTTPServer) {
       if (remainingSockets.length === 0) {
         // No more connections, remove from global online presence
         await removeOnlineUser(userId);
-        io.emit('user-offline', { userId });
+
+        try {
+          const { conversationIds, groupIds } = await getPresenceTargetIds(userId);
+
+          // Emit user-offline only to relevant rooms
+          for (const convId of conversationIds) {
+            void emitToTrackedRoom(convId, `conversation:${convId}`, 'user-offline', { userId });
+          }
+          for (const groupId of groupIds) {
+            void emitToTrackedRoom(groupId, `group:${groupId}`, 'user-offline', { userId });
+          }
+        } catch (e) {
+          console.error('[Socket] Failed to fetch presence targets for offline emit:', e);
+        }
       }
 
       // Clean up Redis auth
       await deleteWsAuth(socket.id);
     });
   });
-
   _io = io;
   return io;
 }

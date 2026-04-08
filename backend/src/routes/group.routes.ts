@@ -1,31 +1,9 @@
 import { Router } from 'express';
-import {
-  createGroup,
-  getPublicGroups,
-  getMyGroups,
-  getGroupDetails,
-  joinGroup,
-  addMemberToGroup,
-  getGroupMembers,
-  removeMemberFromGroup,
-  leaveGroup,
-  updateGroup,
-  promoteMemberToAdmin,
-  getGroupMessages,
-  getGroupParticipantPublicKeys,
-  sendGroupMessage,
-  createPoll,
-  getGroupPolls,
-  voteOnPoll,
-  cancelPoll,
-  executePoll,
-  uploadGroupPicture,
-  deleteGroupPicture,
-  selectGroupPresetAvatar,
-  uploadGroup,
-  uploadGroupChatImage,
-  getPollResults,
-  getGroupOnlineCount
+import {createGroup, getPublicGroups, getMyGroups, getGroupDetails, joinGroup,
+  addMemberToGroup, getGroupMembers, removeMemberFromGroup, leaveGroup, updateGroup,
+  promoteMemberToAdmin, getGroupMessages, getGroupParticipantPublicKeys, sendGroupMessage, createPoll,
+  getGroupPolls, voteOnPoll, cancelPoll, executePoll, uploadGroupPicture, deleteGroupPicture,
+  selectGroupPresetAvatar, uploadGroup, uploadGroupChatImage, getPollResults, getGroupOnlineCount,
 } from '../controllers/group.controller.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { uploadImage, handleMulterError } from '../middleware/upload.middleware.js';
@@ -63,9 +41,9 @@ router.post('/:groupId/join', asyncHandler(joinGroup));
 router.post('/:groupId/leave', asyncHandler(leaveGroup));
 
 // Group messages
-router.get('/:groupId/messages', getGroupMessages);
-router.get('/:groupId/participants/keys', getGroupParticipantPublicKeys);
-router.post('/:groupId/messages', uploadImage.single('image'), sendGroupMessage);
+router.get('/:groupId/messages', asyncHandler(getGroupMessages));
+router.get('/:groupId/participants/keys', asyncHandler(getGroupParticipantPublicKeys));
+router.post('/:groupId/messages', uploadImage.single('image'), asyncHandler(sendGroupMessage));
 
 // Group chat image upload
 router.post('/:groupId/upload-image', uploadImage.single('image'), asyncHandler(uploadGroupChatImage), handleMulterError);

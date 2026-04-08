@@ -88,6 +88,14 @@ export default function ChatWindowPage() {
   const isOtherOnline = !isAnonymous && !!otherUser?.user_id && onlineUsers.has(otherUser.user_id);
   const displayedMessages = useMemo(() => (searchQuery.trim() ? searchResults : messages), [searchQuery, searchResults, messages]);
 
+  const dedupeMessagesById = useCallback((items: Message[]) => {
+    const byId = new Map<string, Message>();
+    for (const item of items) {
+      byId.set(item.message_id, item);
+    }
+    return Array.from(byId.values());
+  }, []);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -322,7 +330,7 @@ export default function ChatWindowPage() {
         console.log('[DEBUG] No AES key available for decryption');
       }
 
-      setMessages(fetchedMessages);
+      setMessages(dedupeMessagesById(fetchedMessages));
 
       if (response.otherUser) {
         setOtherUser(response.otherUser);
@@ -357,7 +365,7 @@ export default function ChatWindowPage() {
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, [conversationId, router, toast, fetchAndDecryptConversationKey, decryptMessages]);
+  }, [conversationId, router, toast, fetchAndDecryptConversationKey, decryptMessages, dedupeMessagesById]);
 
   useEffect(() => {
     if (conversationId) {
@@ -862,7 +870,16 @@ export default function ChatWindowPage() {
         processedMessage = decryptedArray[0];
       }
 
-      setMessages((prev) => [...prev, processedMessage]);
+      setMessages((prev) => {
+        const existingIndex = prev.findIndex((msg) => msg.message_id === processedMessage.message_id);
+        if (existingIndex === -1) {
+          return [...prev, processedMessage];
+        }
+
+        const next = [...prev];
+        next[existingIndex] = processedMessage;
+        return next;
+      });
     };
 
     const handleTyping = ({ userId, isTyping }: { userId: string; isTyping: boolean }) => {
