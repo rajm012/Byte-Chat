@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { FiGithub, FiMail, FiCode } from 'react-icons/fi';
+import { FiGithub, FiMail, FiCode, FiUsers, FiZap, FiDatabase, FiLayers, FiMessageSquare } from 'react-icons/fi';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 
 interface Developer {
   id: number;
@@ -68,69 +69,115 @@ const developers: Developer[] = [
   },
 ];
 
+function useDarkMode() {
+  const [dark, setDark] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (dark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [dark]);
+
+  return [dark, setDark] as const;
+}
+
 const techStack = [
-  { name: 'Next.js', icon: '⚡', desc: 'Frontend framework' },
-  { name: 'Node.js', icon: '🟩', desc: 'Backend runtime' },
-  { name: 'PostgreSQL', icon: '🐘', desc: 'Database' },
-  { name: 'Socket.io', icon: '🔌', desc: 'Real-time events' },
-  { name: 'Tailwind CSS', icon: '🎨', desc: 'Styling' },
-  { name: 'TypeScript', icon: '📘', desc: 'Type safety' },
+  { name: 'Next.js', icon: FiZap, desc: 'Frontend framework', color: 'bg-surface-container-high' },
+  { name: 'Node.js', icon: FiLayers, desc: 'Backend runtime', color: 'bg-green-500/10' },
+  { name: 'PostgreSQL', icon: FiDatabase, desc: 'Database', color: 'bg-blue-500/10' },
+  { name: 'Socket.io', icon: FiMessageSquare, desc: 'Real-time events', color: 'bg-amber-500/10' },
+  { name: 'Tailwind CSS', icon: FiLayers, desc: 'Styling', color: 'bg-cyan-500/10' },
+  { name: 'TypeScript', icon: FiCode, desc: 'Type safety', color: 'bg-blue-500/10' },
 ];
 
 export default function ContactPage() {
+  const [dark, setDark] = useDarkMode();
+
   return (
-    <div className="min-h-screen bg-mesh-warm antialiased py-12 px-4">
+    <div className="min-h-screen bg-mesh-warm antialiased">
+      {/* Navigation Header */}
+      <nav className="glass-nav fixed top-0 w-full z-50">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+          {/* Logo - Link to Home */}
+          <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--primary)' }}>
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <span className="text-xl font-bold text-on-surface">
+              Byte<span className="text-primary">Chat</span>
+            </span>
+          </Link>
+
+          {/* Dark/Light Mode Toggle */}
+          <button
+            aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+            onClick={() => setDark(d => !d)}
+            style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid var(--outline)', background: 'var(--surface-container)' }}
+          >
+            <span className="material-symbols-outlined text-2xl" style={{ color: 'var(--primary)' }}>
+              {dark ? 'light_mode' : 'dark_mode'}
+            </span>
+          </button>
+        </div>
+      </nav>
+
       {/* Background blobs */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-linear-to-br from-pink-300/15 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-[-10%] left-[-5%] w-80 h-80 bg-linear-to-tr from-purple-300/10 to-transparent rounded-full blur-3xl" />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-72 h-72 bg-linear-to-br from-orange-300/8 to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-linear-to-br from-primary-container/20 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-[-10%] left-[-5%] w-80 h-80 bg-linear-to-tr from-tertiary-container/15 to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-72 h-72 bg-linear-to-br from-secondary-container/10 to-transparent rounded-full blur-3xl" />
       </div>
 
-      <div className="max-w-5xl mx-auto">
-        {/* Back nav */}
-        <div className="mb-6">
-          <Link href="/" className="btn-ghost inline-flex items-center gap-2 px-4 py-2 text-sm">
-            ← Back to Home
-          </Link>
-        </div>
+      <div className="max-w-6xl mx-auto pt-24 px-4 pb-12">
 
         {/* Hero */}
-        <div className="text-center mb-10 animate-fade-in">
-          <div className="text-5xl mb-4">👋</div>
-          <h1 className="text-3xl sm:text-4xl font-bold mb-3"
-            style={{ background: 'var(--grad-romance)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+        <div className="text-center mb-12 animate-fade-in">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-linear-to-br from-primary-container via-secondary-container to-tertiary-container mb-6 shadow-lg">
+            <FiUsers className="w-10 h-10 text-on-primary-container" />
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-extrabold mb-3 text-on-surface">
             Meet Our Team
           </h1>
-          <p className="text-sm max-w-lg mx-auto leading-relaxed" style={{ color: 'var(--body)' }}>
+          <p className="text-sm max-w-lg mx-auto leading-relaxed text-on-surface-variant">
             BYTE-CHAT is built by a passionate team of IIT Mandi students. Meet the people behind the platform.
           </p>
         </div>
 
         {/* Developer cards grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
           {developers.map((dev) => (
-            <div key={dev.id} className="glass-card rounded-3xl p-5 flex flex-col gap-4 animate-scale-in">
+            <div key={dev.id} className="glass-strong rounded-3xl p-6 flex flex-col gap-4 animate-scale-in border border-white/10 dark:border-white/5 hover:border-primary/20 transition-colors">
               {/* Avatar + name */}
-              <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-2xl overflow-hidden shrink-0 ring-2 ring-white/20">
+              <div className="flex items-center gap-4">
+                <div className="relative w-16 h-16 rounded-2xl overflow-hidden shrink-0 ring-2 ring-outline-variant/30">
                   <Image src={dev.avatar} alt={dev.name} fill className="object-cover" />
                 </div>
                 <div>
-                  <p className="font-bold text-sm" style={{ color: 'var(--heading)' }}>{dev.name}</p>
-                  <p className="text-xs" style={{ color: 'var(--muted)' }}>{dev.role}</p>
+                  <p className="font-bold text-base text-on-surface">{dev.name}</p>
+                  <p className="text-sm text-on-surface-variant">{dev.role}</p>
                 </div>
               </div>
 
               {/* Bio */}
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--body)' }}>{dev.bio}</p>
+              <p className="text-sm leading-relaxed text-on-surface-variant">{dev.bio}</p>
 
               {/* Expertise tags */}
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {dev.expertise.map((skill) => (
                   <span key={skill}
-                    className="glass rounded-full px-2.5 py-1 text-xs font-medium"
-                    style={{ color: 'var(--body)' }}>
+                    className="glass rounded-full px-3 py-1.5 text-xs font-medium text-on-surface-variant border border-outline-variant/20">
                     {skill}
                   </span>
                 ))}
@@ -139,9 +186,9 @@ export default function ContactPage() {
               {/* Email link */}
               <a
                 href={`mailto:${dev.email}`}
-                className="btn-romance flex items-center justify-center gap-2 py-2 text-xs font-semibold mt-auto"
+                className="btn-romance flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-xl mt-auto"
               >
-                <FiMail className="w-3.5 h-3.5" />
+                <FiMail className="w-4 h-4" />
                 {dev.email}
               </a>
             </div>
@@ -149,48 +196,55 @@ export default function ContactPage() {
         </div>
 
         {/* About + Get in Touch row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
           {/* About the Project */}
-          <div className="glass-strong rounded-3xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <FiCode className="w-5 h-5" style={{ color: 'var(--pink)' }} />
-              <h2 className="text-lg font-bold" style={{ color: 'var(--heading)' }}>About the Project</h2>
+          <div className="glass-strong rounded-3xl p-6 sm:p-8 border border-white/10 dark:border-white/5">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center">
+                <FiCode className="w-5 h-5 text-on-primary-container" />
+              </div>
+              <h2 className="text-xl font-bold text-on-surface">About the Project</h2>
             </div>
-            <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--body)' }}>
+            <p className="text-sm leading-relaxed mb-5 text-on-surface-variant">
               BYTE-CHAT is a campus social platform built exclusively for IIT Mandi students. It provides a safe space for students to connect, communicate, and collaborate.
             </p>
-            <ul className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 'Secure, college-only authentication',
                 'Real-time messaging and group chats',
                 'Anonymous chat features',
                 'Profile and group management',
               ].map((f, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs" style={{ color: 'var(--body)' }}>
-                  <span style={{ color: 'var(--pink)' }}>✦</span>{f}
-                </li>
+                <div key={i} className="flex items-center gap-3 glass rounded-xl p-3">
+                  <span className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-primary text-xs">✓</span>
+                  </span>
+                  <span className="text-sm text-on-surface-variant">{f}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
 
           {/* Get in Touch */}
-          <div className="glass-strong rounded-3xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <FiGithub className="w-5 h-5" style={{ color: 'var(--pink)' }} />
-              <h2 className="text-lg font-bold" style={{ color: 'var(--heading)' }}>Get in Touch</h2>
+          <div className="glass-strong rounded-3xl p-6 sm:p-8 border border-white/10 dark:border-white/5">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-secondary-container flex items-center justify-center">
+                <FiGithub className="w-5 h-5 text-on-secondary-container" />
+              </div>
+              <h2 className="text-xl font-bold text-on-surface">Get in Touch</h2>
             </div>
-            <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--body)' }}>
+            <p className="text-sm leading-relaxed mb-5 text-on-surface-variant">
               Have questions, suggestions, or want to collaborate? Reach out to us!
             </p>
             <div className="space-y-3">
               <a
                 href="mailto:b23397@students.iitmandi.ac.in"
-                className="btn-romance flex items-center justify-center gap-2 py-2.5 text-sm font-semibold"
+                className="btn-romance flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-xl"
               >
                 <FiMail className="w-4 h-4" />
                 Send us an Email
               </a>
-              <Link href="/impress-us" className="btn-ghost flex items-center justify-center gap-2 py-2.5 text-sm">
+              <Link href="/impress-us" className="btn-ghost flex items-center justify-center gap-2 py-2.5 text-sm rounded-xl border border-outline-variant/30">
                 ✨ Impress Us
               </Link>
             </div>
@@ -198,15 +252,20 @@ export default function ContactPage() {
         </div>
 
         {/* Tech stack */}
-        <div className="glass-strong rounded-3xl p-6 mb-8">
-          <h2 className="text-lg font-bold mb-4 text-center" style={{ color: 'var(--heading)' }}>Tech Stack</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="glass-strong rounded-3xl p-6 sm:p-8 mb-10 border border-white/10 dark:border-white/5">
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-tertiary-container flex items-center justify-center">
+              <FiLayers className="w-5 h-5 text-on-tertiary-container" />
+            </div>
+            <h2 className="text-xl font-bold text-on-surface">Tech Stack</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {techStack.map((tech) => (
-              <div key={tech.name} className="glass rounded-2xl p-3 flex items-center gap-3">
-                <span className="text-2xl">{tech.icon}</span>
+              <div key={tech.name} className={`glass rounded-2xl p-4 flex items-center gap-3 border border-outline-variant/20 ${tech.color}`}>
+                <tech.icon className="w-6 h-6 text-on-surface-variant" />
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--heading)' }}>{tech.name}</p>
-                  <p className="text-xs" style={{ color: 'var(--muted)' }}>{tech.desc}</p>
+                  <p className="text-sm font-semibold text-on-surface">{tech.name}</p>
+                  <p className="text-xs text-on-surface-variant">{tech.desc}</p>
                 </div>
               </div>
             ))}
@@ -215,7 +274,7 @@ export default function ContactPage() {
 
         {/* Footer */}
         <div className="text-center">
-          <div className="flex flex-wrap items-center justify-center gap-4 text-sm" style={{ color: 'var(--muted)' }}>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-on-surface-variant">
             <Link href="/terms" className="hover:underline">Terms &amp; Conditions</Link>
             <span>·</span>
             <Link href="/privacy" className="hover:underline">Privacy Policy</Link>

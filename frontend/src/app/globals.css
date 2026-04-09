@@ -1,69 +1,176 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined');
 @import "tailwindcss";
 
+/* Fix for dark mode toggle button to ensure perfect circle and border in all themes */
+.dark-toggle-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--outline);
+  background: var(--surface-container);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  min-width: 40px;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+.dark .dark-toggle-btn {
+  border: 2px solid var(--outline-variant);
+  background: var(--surface-container-highest);
+}
+
+
+
+/* =====================
+   DARK THEME COLORS
+   ===================== */
+.dark {
+  --bg: #002020;
+  --surface: #003535;
+  --surface-container-lowest: #001a1a;
+  --surface-container-low: #003535;
+  --surface-container: #004040;
+  --surface-container-high: #004a4a;
+  --surface-container-highest: #005555;
+
+  --primary: #87ceeb;
+  --on-primary: #002020;
+  --primary-container: #0c6780;
+  --on-primary-container: #ffffff;
+
+  --on-surface: #e7fffe;
+  --on-surface-variant: #bfc8cd;
+  --outline: #6f787d;
+  --outline-variant: #3f484c;
+
+  --glass-bg: rgba(0, 53, 53, 0.72);
+  --glass-bg-strong: rgba(0, 53, 53, 0.90);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-soft: rgba(111, 120, 125, 0.3);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0,0,0,0.2);
+  --glass-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0,0,0,0.3);
+}
+
+/* Hero image rotation only on hover */
+.hero-narrative-box-rect {
+  border-radius: 1.25rem;
+  background: rgba(255,255,255,0.92);
+  box-shadow: 0 8px 32px rgba(12,103,128,0.10);
+  font-size: 1.08rem;
+  font-weight: 600;
+  padding: 1.1rem 2rem;
+  text-align: right;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
 /* ============================================================
-   BYTE-CHAT Design System v2.0 — Modern Romance + Glassmorphism
+   BYTE-CHAT Design System v3.0 — Cozy Material Design 3
    ============================================================ */
 
 :root {
-  /* ── Romance Primary Gradient ─────────────────────────── */
+  /* ── Cozy Primary (Sky/Teal) ──────────────────────────── */
+  --primary:              #0c6780;
+  --on-primary:           #ffffff;
+  --primary-container:    #87ceeb;
+  --on-primary-container: #002020;
+  
+
+  /* ── Cozy Secondary (Sage/Mint) ───────────────────────── */
+  --secondary:              #4a6368;
+  --on-secondary:           #ffffff;
+  --secondary-container:    #cce5ea;
+  --on-secondary-container:   #062023;
+
+  /* ── Cozy Tertiary (Coral/Peach) ──────────────────────── */
+  --tertiary:              #7f4e52;
+  --on-tertiary:           #ffffff;
+  --tertiary-container:    #f9b1bc;
+  --on-tertiary-container: #331019;
+
+  /* ── Surface Containers (Cozy Layers) ─────────────────── */
+  --bg:                    #e2fffe;
+  --surface:               #ffffff;
+  --surface-container-lowest: #e8fffe;
+  --surface-container-low:    #d2f5f4;
+  --surface-container:        #d7fafa;
+  --surface-container-high:   #ccefee;
+  --surface-container-highest:#c6e9e9;
+
+  /* ── Neutral Colors ───────────────────────────────────── */
+  --on-surface:            #002020;
+  --on-surface-variant:    #3f484c;
+  --outline:               #6f787d;
+  --outline-variant:       #bfc8cd;
+
+  /* ── Legacy aliases for compatibility ───────────────── */
   --pink:          #FF6B9D;
   --coral:         #FF8E72;
   --orange:        #FFA06B;
-
-  /* ── Trust / Anonymous Gradient ──────────────────────── */
   --lavender:      #C084FC;
   --purple:        #A855F7;
   --deep-purple:   #9333EA;
   --indigo:        #6366F1;
-
-  /* ── Accent ───────────────────────────────────────────── */
   --blue:          #3B82F6;
   --cyan:          #06B6D4;
   --green:         #84CC16;
   --yellow:        #FACC15;
   --hot-pink:      #EC4899;
+  --surface-soft:  var(--surface-container-low);
+  --border-light:  var(--outline-variant);
+  --border:        var(--outline);
+  --muted:         var(--on-surface-variant);
+  --body:          var(--on-surface);
+  --heading:       var(--on-surface);
 
-  /* ── Neutral Light Mode ───────────────────────────────── */
-  --bg:            #FDFCFB;
-  --surface:       #FFFFFF;
-  --surface-soft:  #F9F7F6;
-  --border-light:  #F1EEEC;
-  --border:        #E5E1DD;
-  --muted:         #A8A29E;
-  --body:          #57534E;
-  --heading:       #292524;
-
-  /* ── Glassmorphism (Light) ───────────────────────────── */
+  /* ── Glassmorphism (Cozy) ────────────────────────────── */
   --glass-bg:         rgba(255, 255, 255, 0.72);
   --glass-bg-strong:  rgba(255, 255, 255, 0.88);
-  --glass-border:     rgba(255, 255, 255, 0.8);
-  --glass-border-soft: rgba(241, 238, 236, 0.9);
-  --glass-shadow:     0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0,0,0,0.04);
-  --glass-shadow-lg:  0 20px 60px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0,0,0,0.06);
+  --glass-border:     rgba(255, 255, 255, 0.6);
+  --glass-border-soft: rgba(191, 200, 205, 0.4);
+  --glass-shadow:     0 8px 32px rgba(12, 103, 128, 0.08), 0 2px 8px rgba(0, 32, 32, 0.04);
+  --glass-shadow-lg:  0 20px 60px rgba(12, 103, 128, 0.12), 0 8px 24px rgba(0, 32, 32, 0.06);
 
-  /* ── Gradients ───────────────────────────────────────── */
-  --grad-romance:  linear-gradient(135deg, #FF6B9D 0%, #FF8E72 50%, #FFA06B 100%);
-  --grad-trust:    linear-gradient(135deg, #C084FC 0%, #A855F7 50%, #9333EA 100%);
-  --grad-mystery:  linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #A855F7 100%);
+  /* ── Cozy Gradients ──────────────────────────────────── */
+  --grad-romance:  linear-gradient(135deg, #87CEEB 0%, #B4E1E4 50%, #E6E6FA 100%);
+  --grad-trust:    linear-gradient(135deg, #4A6368 0%, #6B8E95 50%, #87CEEB 100%);
+  --grad-mystery:  linear-gradient(135deg, #0C6780 0%, #4A6368 50%, #87CEEB 100%);
   --grad-ocean:    linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%);
+  --grad-sky:      linear-gradient(135deg, #87CEEB 0%, #E6E6FA 50%, #F9B1BC 100%);
   --grad-danger:   linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+
+  /* ── Sky Gradient for primary actions ─────────────────── */
+  --sky-gradient: linear-gradient(135deg, #87CEEB 0%, #B4E1E4 50%, #E6E6FA 100%);
 }
 
-/* ── Dark Mode Variables ────────────────────────────────── */
+/* ── Dark Mode Variables (Cozy Dark) ───────────────────── */
 .dark {
-  --bg:            #1C1917;
-  --surface:       #292524;
-  --surface-soft:  #3F3A37;
-  --border-light:  #3F3A37;
-  --border:        #57534E;
-  --muted:         #A8A29E;
-  --body:          #E7E5E4;
-  --heading:       #FAFAF9;
+  --bg:                    #002020;
+  --surface:               #003535;
+  --surface-container-lowest: #001a1a;
+  --surface-container-low:    #003535;
+  --surface-container:        #004040;
+  --surface-container-high:   #004a4a;
+  --surface-container-highest:#005555;
 
-  --glass-bg:         rgba(41, 37, 36, 0.72);
-  --glass-bg-strong:  rgba(41, 37, 36, 0.90);
+  --primary:              #87ceeb;
+  --on-primary:           #002020;
+  --primary-container:    #0c6780;
+  --on-primary-container: #ffffff;
+
+  --on-surface:            #e7fffe;
+  --on-surface-variant:    #bfc8cd;
+  --outline:               #6f787d;
+  --outline-variant:       #3f484c;
+
+  --glass-bg:         rgba(0, 53, 53, 0.72);
+  --glass-bg-strong:  rgba(0, 53, 53, 0.90);
   --glass-border:     rgba(255, 255, 255, 0.08);
-  --glass-border-soft: rgba(87, 83, 78, 0.5);
+  --glass-border-soft: rgba(111, 120, 125, 0.3);
   --glass-shadow:     0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0,0,0,0.2);
   --glass-shadow-lg:  0 20px 60px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0,0,0,0.3);
 }
@@ -74,32 +181,62 @@ html, body, #__next { height: 100%; }
 * { box-sizing: border-box; }
 
 body {
-  font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
   background-color: var(--bg);
-  color: var(--body);
+  color: var(--on-surface);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
 }
 
-/* ── Warm Mesh Background ────────────────────────────────── */
+.font-headline {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* ── Cozy Mesh Background ──────────────────────────────── */
 .bg-mesh-warm {
   background-color: var(--bg);
   background-image:
-    radial-gradient(at 15% 20%, rgba(255, 107, 157, 0.18) 0px, transparent 55%),
-    radial-gradient(at 85% 10%, rgba(255, 160, 107, 0.14) 0px, transparent 50%),
-    radial-gradient(at 50% 80%, rgba(168, 85, 247, 0.12) 0px, transparent 55%),
-    radial-gradient(at 80% 70%, rgba(255, 142, 114, 0.10) 0px, transparent 50%);
+    radial-gradient(at 15% 20%, rgba(135, 206, 235, 0.25) 0px, transparent 55%),
+    radial-gradient(at 85% 10%, rgba(180, 225, 228, 0.20) 0px, transparent 50%),
+    radial-gradient(at 50% 80%, rgba(249, 177, 188, 0.15) 0px, transparent 55%),
+    radial-gradient(at 80% 70%, rgba(135, 206, 235, 0.12) 0px, transparent 50%);
 }
 
 .dark .bg-mesh-warm {
   background-color: var(--bg);
   background-image:
-    radial-gradient(at 15% 20%, rgba(255, 107, 157, 0.08) 0px, transparent 55%),
-    radial-gradient(at 85% 10%, rgba(255, 160, 107, 0.06) 0px, transparent 50%),
-    radial-gradient(at 50% 80%, rgba(168, 85, 247, 0.06) 0px, transparent 55%),
-    radial-gradient(at 80% 70%, rgba(255, 142, 114, 0.05) 0px, transparent 50%);
+    radial-gradient(at 15% 20%, rgba(135, 206, 235, 0.10) 0px, transparent 55%),
+    radial-gradient(at 85% 10%, rgba(180, 225, 228, 0.08) 0px, transparent 50%),
+    radial-gradient(at 50% 80%, rgba(249, 177, 188, 0.06) 0px, transparent 55%),
+    radial-gradient(at 80% 70%, rgba(135, 206, 235, 0.05) 0px, transparent 50%);
 }
+
+/* ── Cozy Surface Container Backgrounds ────────────────── */
+.bg-surface-container { background-color: var(--surface-container); }
+.bg-surface-container-low { background-color: var(--surface-container-low); }
+.bg-surface-container-lowest { background-color: var(--surface-container-lowest); }
+.bg-surface-container-high { background-color: var(--surface-container-high); }
+.bg-surface-container-highest { background-color: var(--surface-container-highest); }
+
+/* ── Cozy Text Colors ───────────────────────────────────── */
+.text-primary { color: var(--primary); }
+.text-secondary { color: var(--secondary); }
+.text-tertiary { color: var(--tertiary); }
+.text-on-surface { color: var(--on-surface); }
+.text-on-surface-variant { color: var(--on-surface-variant); }
+.text-on-primary { color: var(--on-primary); }
+.text-on-secondary { color: var(--on-secondary); }
+.text-on-tertiary { color: var(--on-tertiary); }
+
+/* ── Cozy Background Utilities ──────────────────────────── */
+.bg-primary { background-color: var(--primary); }
+.bg-primary-container { background-color: var(--primary-container); }
+.bg-secondary-container { background-color: var(--secondary-container); }
+.bg-tertiary-container { background-color: var(--tertiary-container); }
+.text-on-primary-container { color: var(--on-primary-container); }
+.text-on-secondary-container { color: var(--on-secondary-container); }
+.text-on-tertiary-container { color: var(--on-tertiary-container); }
 
 /* ── Glassmorphism Cards ─────────────────────────────────── */
 .glass {
@@ -141,6 +278,15 @@ body {
   border-bottom: 1px solid var(--glass-border-soft);
 }
 
+/* ── Glass Panel (CTA Section) ──────────────────────────── */
+.glass-panel {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 20px 60px rgba(12, 103, 128, 0.15);
+}
+
 /* ── Gradient Text ───────────────────────────────────────── */
 .text-gradient-romance {
   background: var(--grad-romance);
@@ -165,19 +311,19 @@ body {
 
 /* ── Gradient Buttons ────────────────────────────────────── */
 .btn-romance {
-  background: var(--grad-romance);
-  color: white;
+  background: var(--sky-gradient);
+  color: var(--on-primary-container);
   border: none;
   border-radius: 14px;
-  font-weight: 600;
+  font-weight: 700;
   transition: all 250ms cubic-bezier(0.4,0,0.2,1);
-  box-shadow: 0 4px 15px rgba(255, 107, 157, 0.35);
+  box-shadow: 0 4px 15px rgba(135, 206, 235, 0.35);
 }
 .btn-romance:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(255, 107, 157, 0.45);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(135, 206, 235, 0.45);
 }
-.btn-romance:active { transform: translateY(0); }
+.btn-romance:active { transform: translateY(0) scale(0.98); }
 
 .btn-purple {
   background: var(--grad-trust);
@@ -186,24 +332,54 @@ body {
   border-radius: 14px;
   font-weight: 600;
   transition: all 250ms cubic-bezier(0.4,0,0.2,1);
-  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.35);
+  box-shadow: 0 4px 15px rgba(74, 99, 104, 0.35);
 }
 .btn-purple:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(168, 85, 247, 0.45);
+  box-shadow: 0 8px 25px rgba(74, 99, 104, 0.45);
 }
 
 .btn-ghost {
-  background: rgba(255,107,157,0.08);
-  border: 1.5px solid rgba(255,107,157,0.3);
-  color: var(--pink);
+  background: rgba(135, 206, 235, 0.12);
+  border: 1.5px solid rgba(135, 206, 235, 0.4);
+  color: var(--primary);
   border-radius: 14px;
   font-weight: 600;
   transition: all 250ms cubic-bezier(0.4,0,0.2,1);
 }
 .btn-ghost:hover {
-  background: rgba(255,107,157,0.14);
+  background: rgba(135, 206, 235, 0.2);
   transform: translateY(-2px);
+}
+
+/* ── Cozy Action Buttons ─────────────────────────────────── */
+.btn-sky {
+  background: var(--sky-gradient);
+  color: var(--on-primary-container);
+  font-weight: 700;
+  padding: 1rem 2.5rem;
+  border-radius: 9999px;
+  border: none;
+  transition: all 300ms cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 4px 20px rgba(135, 206, 235, 0.4);
+}
+.btn-sky:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 30px rgba(135, 206, 235, 0.5);
+}
+.btn-sky:active { transform: scale(0.95); }
+
+.btn-outline-cozy {
+  background: var(--surface-container-lowest);
+  border: 1px solid rgba(111, 120, 125, 0.3);
+  color: var(--primary);
+  font-weight: 700;
+  padding: 1rem 2.5rem;
+  border-radius: 9999px;
+  transition: all 300ms ease;
+}
+.btn-outline-cozy:hover {
+  background: var(--surface-container-low);
 }
 
 /* ── Input Fields ────────────────────────────────────────── */
@@ -401,6 +577,37 @@ body {
   to   { transform: translateX(0);   opacity: 1; }
 }
 .animate-slide-in-right { animation: slide-in-right 0.3s ease-out; }
+
+/* ── Material Symbols Icons ─────────────────────────────── */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+.material-symbols-outlined.icon-filled {
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
 
 /* ── Emoji picker theming ─────────────────────────────────── */
 .emoji-picker-react {

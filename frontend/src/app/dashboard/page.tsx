@@ -1,34 +1,83 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { User, Group } from '@/types/chat.types';
 import { groupService } from '@/services/group.service';
 import { useToast } from '@/contexts/ToastContext';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useNotifications } from '@/contexts/NotificationContext';
 import Image from 'next/image';
 import './dashboard.css';
+
+function useDarkMode() {
+  const [dark, setDark] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (dark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [dark]);
+
+  return [dark, setDark] as const;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const toast = useToast();
-  const { theme, toggleTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const { notifications, count: notificationCount, markRead, deleteOne } = useNotifications();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const [dark, setDark] = useDarkMode();
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showNotifications]);
+  const [, setMounted] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [, setMyGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'users' | 'groups'>('users');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterBranch, setFilterBranch] = useState('all');
-  const [filterGender, setFilterGender] = useState('all');
+  const [filterBranch, ] = useState('all');
+  const [filterGender, ] = useState('all');
+  const [filterYear, ] = useState('all');
   const [error, setError] = useState<string | null>(null);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [navigating, setNavigating] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ name: string; dp_url?: string; roll_no?: string } | null>(null);
 
   useEffect(() => {
     setMounted(true);
+    // Get current user from localStorage
+    const userRaw = localStorage.getItem('user');
+    if (userRaw) {
+      try {
+        const parsed = JSON.parse(userRaw);
+        setCurrentUser(parsed);
+      } catch {
+        // ignore
+      }
+    }
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -110,7 +159,8 @@ export default function DashboardPage() {
       user.roll_no.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesBranch = filterBranch === 'all' || user.branch === filterBranch;
     const matchesGender = filterGender === 'all' || user.gender === filterGender;
-    return matchesSearch && matchesBranch && matchesGender;
+    const matchesYear = filterYear === 'all' || user.roll_no?.toLowerCase().includes(filterYear.toLowerCase());
+    return matchesSearch && matchesBranch && matchesGender && matchesYear;
   });
 
   const filteredGroups = groups.filter((group) => {
@@ -118,12 +168,16 @@ export default function DashboardPage() {
       (group.group_desc && group.group_desc.toLowerCase().includes(searchQuery.toLowerCase()));
   });
 
-  const branches = [...new Set(users.map((u) => u.branch))];
-
   const handleStartChat = (userId: string, isAnonymous: boolean = false) => {
-    if (navigating) return; // Prevent double-clicks
+    if (navigating) return;
     setNavigating(true);
     router.push(`/chat/new?userId=${userId}&anonymous=${isAnonymous}`);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('theme');
+    router.push('/login');
   };
 
   const handleJoinGroup = async (groupId: string, isAnonymous: boolean = false) => {
@@ -146,8 +200,8 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen bg-mesh-warm flex items-center justify-center">
         <div className="text-center animate-fade-in">
-          <div className="w-16 h-16 rounded-full border-4 border-t-transparent mx-auto mb-4 animate-spin" style={{ borderColor: 'var(--pink)', borderTopColor: 'transparent' }} />
-          <p className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Loading campus…</p>
+          <div className="w-16 h-16 rounded-full border-4 border-t-transparent mx-auto mb-4 animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
+          <p className="text-sm font-medium text-on-surface-variant">Loading campus…</p>
         </div>
       </div>
     );
@@ -157,150 +211,298 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen bg-mesh-warm flex items-center justify-center px-5">
         <div className="glass-strong rounded-3xl p-8 text-center max-w-sm animate-scale-in">
-          <p className="text-lg font-bold mb-2" style={{ color: 'var(--heading)' }}>{error}</p>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Redirecting…</p>
+          <p className="text-lg font-bold mb-2 text-on-surface">{error}</p>
+          <p className="text-sm text-on-surface-variant">Redirecting…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-mesh-warm antialiased">
+    <div className="min-h-screen bg-mesh-warm antialiased pb-28">
       {/* Fixed blobs */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] right-[-5%] w-125 h-125 bg-linear-to-br from-pink-300/15 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-linear-to-br from-purple-300/10 to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-[-10%] right-[-5%] w-125 h-125 bg-linear-to-br from-primary-container/15 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-linear-to-br from-tertiary-container/10 to-transparent rounded-full blur-3xl" />
       </div>
 
-      {/* Sticky Nav */}
-      <header className="glass-nav sticky top-0 z-40 px-5 py-3.5">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--grad-romance)' }}>
+      {/* Top Navigation Bar - CampusHub Style */}
+      <header className="glass-nav fixed top-0 w-full z-50 shadow-[0_20px_40px_rgba(0,32,32,0.06)]">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+          {/* Logo */}
+          <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-primary">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <span className="text-lg font-bold" style={{ color: 'var(--heading)' }}>Byte<span className="text-gradient-romance">Chat</span></span>
+            <span className="text-xl font-black text-on-surface tracking-tight">
+              Byte<span className="text-primary">chat</span>
+            </span>
+          </Link>
+
+          {/* Search Bar Center */}
+          <div className="hidden md:flex flex-1 max-w-md mx-8">
+            <div className="relative w-full">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+              <input
+                type="text"
+                placeholder={activeTab === 'users' ? 'Search batchmates...' : 'Search groups...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-primary text-sm text-on-surface"
+              />
+            </div>
           </div>
-          <nav className="flex items-center gap-2">
-            <Link href="/chat" className="px-4 py-2 rounded-xl text-sm font-semibold glass transition-all hover:scale-105" style={{ color: 'var(--body)' }}>💬 Chats</Link>
-            <Link href="/my-groups" className="px-4 py-2 rounded-xl text-sm font-semibold glass transition-all hover:scale-105" style={{ color: 'var(--body)' }}>👥 My Groups</Link>
-            <Link href="/my-identities" className="px-4 py-2 rounded-xl text-sm font-semibold glass transition-all hover:scale-105" style={{ color: 'var(--purple)' }}>🎭 Identities</Link>
-            <Link href="/profile/edit" className="px-4 py-2 rounded-xl text-sm font-semibold btn-romance">Profile</Link>
-            {mounted && (
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-2">
+            {/* Notification Icon with Dropdown */}
+            <div ref={notifRef} className="relative">
               <button
-                onClick={toggleTheme}
-                className="px-3 py-2 rounded-xl text-sm font-semibold glass transition-all hover:scale-105"
-                style={{ color: 'var(--body)' }}
-                aria-label="Toggle theme"
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2 text-on-surface hover:bg-surface-container-high transition-all duration-300 rounded-full relative"
+                aria-label="Notifications"
               >
-                {theme === 'light' ? '🌙' : '☀️'}
+                <span className="material-symbols-outlined">notifications</span>
+                {notificationCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-4.5 h-4.5 flex items-center justify-center bg-tertiary text-on-tertiary text-[10px] font-bold rounded-full px-1">
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </span>
+                )}
               </button>
-            )}
-          </nav>
+              {/* Notification Dropdown */}
+              {showNotifications && (
+                <div className="absolute top-full right-0 mt-2 w-80 bg-surface-container-lowest rounded-xl shadow-[0_20px_40px_rgba(0,32,32,0.15)] border border-outline-variant/30 overflow-hidden z-50">
+                  <div className="p-3 border-b border-outline-variant/30 flex items-center justify-between">
+                    <span className="font-semibold text-sm text-on-surface">Notifications</span>
+                    {notificationCount > 0 && (
+                      <button
+                        onClick={() => { markRead(); }}
+                        className="text-xs text-primary hover:text-primary/80 font-medium"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-2">notifications_off</span>
+                        <p className="text-sm text-on-surface-variant">No notifications</p>
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.notification_id}
+                          className={`p-3 border-b border-outline-variant/20 hover:bg-surface-container-high/50 transition-colors ${!notif.read ? 'bg-primary-container/10' : ''}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                            <p className="text-sm text-on-surface truncate">{notif.message}</p>
+                            <p className="text-[10px] text-on-surface-variant mt-1">
+                              {typeof notif.created_at === "string" || typeof notif.created_at === "number"
+                                ? new Date(notif.created_at).toLocaleDateString()
+                                : "Unknown date"}
+                            </p>
+                          </div>
+                            <button
+                              onClick={() => {
+                                if (notif.notification_id) {
+                                  deleteOne(notif.notification_id);
+                                }
+                              }}
+                              className="p-1 text-on-surface-variant hover:text-error rounded-full hover:bg-error-container/30 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-sm">close</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="p-2 border-t border-outline-variant/30 bg-surface-container-high/30">
+                    <button
+                      onClick={() => { setShowNotifications(false); router.push('/chat'); }}
+                      className="w-full py-2 text-xs font-semibold text-primary hover:bg-primary-container/30 rounded-lg transition-colors"
+                    >
+                      View all chats
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Dark Mode */}
+            <button
+              onClick={() => setDark(d => !d)}
+              className="p-2 text-on-surface hover:bg-surface-container-high transition-all duration-300 rounded-full"
+              aria-label="Toggle theme"
+            >
+              <span className="material-symbols-outlined">{dark ? 'light_mode' : 'dark_mode'}</span>
+            </button>
+            <div className="h-8 w-px bg-outline-variant/30 mx-1" />
+            {/* Profile + Logout */}
+            <div className="flex items-center gap-2">
+              <Link
+                href="/profile/edit"
+                className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-container shadow-sm hover:scale-105 transition-transform"
+              >
+                {currentUser?.dp_url ? (
+                  <Image
+                    src={currentUser.dp_url}
+                    alt={currentUser.name || 'Profile'}
+                    width={40}
+                    height={40}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-linear-to-br from-primary to-tertiary flex items-center justify-center">
+                    <span className="material-symbols-outlined text-white text-lg">person</span>
+                  </div>
+                )}
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="p-2 text-on-surface hover:bg-surface-container-high transition-all duration-300 rounded-full scale-95 active:scale-90"
+              >
+                <span className="material-symbols-outlined">logout</span>
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-5 py-8">
-        {/* Top controls row */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6 items-start md:items-center justify-between">
-          {/* Pill Tabs */}
-          <div className="glass rounded-2xl p-1 flex gap-1">
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeTab === 'users' ? 'btn-romance shadow-md' : ''}`}
-              style={activeTab !== 'users' ? { color: 'var(--body)' } : {}}
-            >
-              👤 Students
-            </button>
-            <button
-              onClick={() => setActiveTab('groups')}
-              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeTab === 'groups' ? 'btn-romance shadow-md' : ''}`}
-              style={activeTab !== 'groups' ? { color: 'var(--body)' } : {}}
-            >
-              👥 Groups
-            </button>
-          </div>
-
-          {/* Search + filters */}
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="relative">
-              <svg className="dashboard-search-icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--muted)' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input type="text" placeholder={activeTab === 'users' ? 'Search students…' : 'Search groups…'} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="dashboard-search-input" />
+      <main className="max-w-7xl mx-auto px-5 sm:px-8 pt-24 pb-12">
+        {/* Header Section with Editorial Layout */}
+        <header className="mb-12">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div>
+              <span className="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Dorm Directory</span>
+              <h1 className="text-4xl sm:text-5xl font-extrabold text-on-surface tracking-tight leading-none">
+                Meet your <span className="text-primary italic">batchmates.</span>
+              </h1>
             </div>
-            {activeTab === 'users' && (
-              <>
-                <select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="select-romance">
-                  <option value="all">All Branches</option>
-                  {branches.map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
-                <select value={filterGender} onChange={(e) => setFilterGender(e.target.value)} className="select-romance">
-                  <option value="all">All Genders</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </>
-            )}
-            {activeTab === 'groups' && (
-              <button onClick={() => setShowCreateGroup(true)} className="btn-romance px-5 py-2.5 text-sm font-semibold">+ Create Group</button>
-            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`px-6 py-2 rounded-full font-semibold text-sm transition-all ${
+                  activeTab === 'users'
+                    ? 'bg-tertiary-container text-on-tertiary-container hover:scale-105'
+                    : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
+                }`}
+              >
+                Students
+              </button>
+              <button
+                onClick={() => setActiveTab('groups')}
+                className={`px-6 py-2 rounded-full font-semibold text-sm transition-all ${
+                  activeTab === 'groups'
+                    ? 'bg-tertiary-container text-on-tertiary-container hover:scale-105'
+                    : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
+                }`}
+              >
+                Groups
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Mobile Search (visible only on small screens) */}
+        <div className="md:hidden mb-6">
+          <div className="relative w-full">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+            <input
+              type="text"
+              placeholder={activeTab === 'users' ? 'Search batchmates...' : 'Search groups...'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-primary text-sm text-on-surface"
+            />
           </div>
         </div>
 
-        {/* Stats strip */}
-        <div className="grid grid-cols-3 gap-4 mb-7">
-          {[
-            { label: activeTab === 'users' ? 'Total Students' : 'Public Groups', value: activeTab === 'users' ? users.length : groups.length, color: 'var(--pink)' },
-            { label: activeTab === 'users' ? 'Branches' : 'Shown', value: activeTab === 'users' ? branches.length : filteredGroups.length, color: 'var(--coral)' },
-            { label: 'Showing', value: activeTab === 'users' ? filteredUsers.length : filteredGroups.length, color: 'var(--purple)' },
-          ].map((s) => (
-            <div key={s.label} className="glass-card rounded-2xl p-4 text-center">
-              <p className="text-2xl font-extrabold" style={{ color: s.color }}>{s.value}</p>
-              <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--muted)' }}>{s.label}</p>
-            </div>
-          ))}
-        </div>
+        {/* Decorative floating elements */}
+        <div className="absolute top-32 left-10 w-20 h-20 bg-primary/5 rounded-full blur-2xl -z-10 animate-pulse" />
+        <div className="absolute top-48 right-20 w-32 h-32 bg-tertiary/5 rounded-full blur-3xl -z-10 animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="hidden lg:block absolute top-64 left-1/4 w-16 h-16 bg-secondary/5 rounded-full blur-xl -z-10 animate-pulse" style={{ animationDelay: '2s' }} />
 
-        {/* User Cards */}
+        {activeTab === 'groups' && (
+          <div className="flex justify-between items-center mb-8">
+            <p className="text-sm text-on-surface-variant">
+              {filteredGroups.length} public groups available
+            </p>
+            <button
+              onClick={() => setShowCreateGroup(true)}
+              className="px-5 py-2 rounded-full bg-primary text-on-primary font-semibold text-sm hover:scale-105 transition-transform flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">add</span>
+              Create Group
+            </button>
+          </div>
+        )}
+
+        {/* Staggered Grid of Profile Cards - Compact with 3 Buttons */}
         {activeTab === 'users' && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {filteredUsers.map((user, index) => (
-                <div key={user.user_id} className="glass-card rounded-2xl overflow-hidden flex flex-col">
-                  {/* Avatar */}
-                  <div className="relative h-40 flex items-center justify-center" style={{ background: 'linear-gradient(135deg,rgba(255,107,157,.15),rgba(168,85,247,.15))' }}>
+                <div
+                  key={user.user_id}
+                  className={`group relative flex flex-col bg-surface-container-lowest rounded-lg overflow-hidden transition-all duration-500 hover:shadow-[0_20px_40px_-10px_rgba(0,32,32,0.15)] hover:-translate-y-1 ${index % 3 === 1 ? 'md:mt-6' : ''}`}
+                >
+                  {/* Image - Shorter aspect ratio */}
+                  <div className="aspect-square overflow-hidden relative">
                     {user.dp_url ? (
                       <Image
                         src={user.dp_url}
                         alt={user.name}
-                        width={112}
-                        height={112}
-                        className="w-28 h-28 rounded-full object-cover ring-4 ring-white/60"
-                        priority={index < 4}
+                        fill
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        priority={index < 6}
                       />
                     ) : (
-                      <div className="w-28 h-28 rounded-full flex items-center justify-center text-4xl font-extrabold text-white ring-4 ring-white/40" style={{ background: 'var(--grad-romance)' }}>
-                        {user.name.charAt(0).toUpperCase()}
+                      <div className="w-full h-full bg-linear-to-br from-primary-container to-tertiary-container flex items-center justify-center">
+                        <span className="text-3xl font-bold text-on-primary-container">{user.name.charAt(0).toUpperCase()}</span>
                       </div>
                     )}
-
+                    {/* Random decorative overlay on some cards */}
+                    {index % 5 === 0 && (
+                      <div className="absolute top-2 right-2 w-4 h-4 bg-tertiary/30 rounded-full blur-sm" />
+                    )}
+                    {index % 7 === 3 && (
+                      <div className="absolute bottom-2 left-2 w-3 h-3 bg-primary/40 rounded-full" />
+                    )}
                   </div>
                   {/* Info */}
-                  <div className="p-4 flex flex-col flex-1">
-                    <h3 className="font-bold text-base truncate" style={{ color: 'var(--heading)' }}>{user.name}</h3>
-                    <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--pink)' }}>{user.roll_no}</p>
-                    <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{user.branch} · {user.gender}</p>
-                    {user.bio && <p className="text-xs mt-2 line-clamp-2" style={{ color: 'var(--body)' }}>{user.bio}</p>}
-                    {/* Buttons */}
-                    <div className="mt-auto pt-4 flex gap-2">
-                      <Link href={`/profile/${user.roll_no}`} className="flex-1 py-2 rounded-xl text-xs font-semibold text-center glass transition-all hover:scale-105" style={{ color: 'var(--body)' }}>View</Link>
-                      <button onClick={() => handleStartChat(user.user_id, false)} disabled={navigating} className="flex-1 py-2 rounded-xl text-xs font-semibold btn-romance disabled:opacity-60">Chat</button>
+                  <div className="p-2.5 flex flex-col gap-1.5">
+                    <div>
+                      <h3 className="text-xs font-bold text-on-surface truncate">{user.name}</h3>
+                      <p className="text-[9px] font-bold text-secondary tracking-wider uppercase">#{user.roll_no}</p>
                     </div>
-                    <button onClick={() => handleStartChat(user.user_id, true)} disabled={navigating} className="mt-2 w-full py-2 rounded-xl text-xs font-semibold btn-purple disabled:opacity-60">🎭 Chat Anonymously</button>
+                    {/* 3 Action Buttons in a row */}
+                    <div className="flex gap-1 mt-auto">
+                      <Link
+                        href={`/profile/${user.roll_no}`}
+                        className="flex-1 py-1 rounded-md text-[9px] font-semibold text-center bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+                      >
+                        View
+                      </Link>
+                      <button
+                        onClick={() => handleStartChat(user.user_id, false)}
+                        disabled={navigating}
+                        className="flex-1 py-1 rounded-md text-[9px] font-semibold bg-primary text-on-primary hover:scale-105 transition-transform disabled:opacity-60"
+                      >
+                        Chat
+                      </button>
+                      <button
+                        onClick={() => handleStartChat(user.user_id, true)}
+                        disabled={navigating}
+                        className="flex-1 py-1 rounded-md text-[9px] font-semibold bg-tertiary-container text-on-tertiary-container hover:scale-105 transition-transform disabled:opacity-60"
+                        title="Anonymous Chat"
+                      >
+                        Anon
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -308,47 +510,70 @@ export default function DashboardPage() {
             {filteredUsers.length === 0 && (
               <div className="glass-strong rounded-2xl p-12 text-center">
                 <p className="text-4xl mb-3">🔍</p>
-                <p className="font-semibold" style={{ color: 'var(--heading)' }}>No students found</p>
-                <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Try adjusting your filters</p>
+                <p className="font-semibold text-on-surface">No students found</p>
+                <p className="text-sm mt-1 text-on-surface-variant">Try a different search</p>
               </div>
             )}
           </>
         )}
 
-        {/* Group Cards */}
+        {/* Group Cards - Compact with 3 Buttons */}
         {activeTab === 'groups' && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {filteredGroups.map((group, index) => (
-                <div key={group.group_id} className="glass-card rounded-2xl p-5 flex flex-col gap-3">
-                  <div className="flex items-start gap-3">
+                <div
+                  key={group.group_id}
+                  className={`group relative flex flex-col bg-surface-container-lowest rounded-lg overflow-hidden transition-all duration-500 hover:shadow-[0_20px_40px_-10px_rgba(0,32,32,0.15)] hover:-translate-y-1 ${index % 3 === 1 ? 'md:mt-6' : ''}`}
+                >
+                  {/* Group Image - Shorter aspect ratio */}
+                  <div className="aspect-square overflow-hidden relative">
                     {group.group_dp_url ? (
                       <Image
                         src={group.group_dp_url}
                         alt={group.group_name}
-                        width={48}
-                        height={48}
-                        className="w-12 h-12 rounded-xl object-cover shrink-0"
-                        priority={index < 4}
+                        fill
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        priority={index < 6}
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl text-white shrink-0" style={{ background: 'var(--grad-ocean)' }}>
-                        {group.group_name.charAt(0).toUpperCase()}
+                      <div className="w-full h-full bg-linear-to-br from-secondary-container to-primary-container flex items-center justify-center">
+                        <span className="text-3xl font-bold text-on-secondary-container">{group.group_name.charAt(0).toUpperCase()}</span>
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-base truncate" style={{ color: 'var(--heading)' }}>{group.group_name}</h3>
-                        <span className="shrink-0 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(59,130,246,.15)', color: '#3B82F6' }}>Public</span>
-                      </div>
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{group.member_count}/{group.max_members} members</p>
-                    </div>
+                    {/* Random decorative overlay */}
+                    {index % 5 === 2 && (
+                      <div className="absolute top-2 right-2 w-4 h-4 bg-tertiary/30 rounded-full blur-sm" />
+                    )}
                   </div>
-                  {group.group_desc && <p className="text-sm line-clamp-2" style={{ color: 'var(--body)' }}>{group.group_desc}</p>}
-                  <div className="flex gap-2 mt-auto">
-                    <Link href={`/groups/${group.group_id}`} className="flex-1 py-2 rounded-xl text-xs font-semibold text-center glass transition-all hover:scale-105" style={{ color: 'var(--body)' }}>Details</Link>
-                    <button onClick={() => handleJoinGroup(group.group_id, false)} className="flex-1 py-2 rounded-xl text-xs font-semibold text-white" style={{ background: 'var(--grad-ocean)' }}>Join</button>
-                    <button onClick={() => handleJoinGroup(group.group_id, true)} className="flex-1 py-2 rounded-xl text-xs font-semibold btn-purple">🎭 Anon</button>
+                  {/* Info */}
+                  <div className="p-2.5 flex flex-col gap-1.5">
+                    <div>
+                      <h3 className="text-xs font-bold text-on-surface truncate">{group.group_name}</h3>
+                      <p className="text-[9px] font-bold text-secondary tracking-wider uppercase">{group.member_count}/{group.max_members} members</p>
+                    </div>
+                    {/* 3 Action Buttons in a row */}
+                    <div className="flex gap-1 mt-auto">
+                      <Link
+                        href={`/groups/${group.group_id}`}
+                        className="flex-1 py-1 rounded-md text-[9px] font-semibold text-center bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+                      >
+                        View
+                      </Link>
+                      <button
+                        onClick={() => handleJoinGroup(group.group_id, false)}
+                        className="flex-1 py-1 rounded-md text-[9px] font-semibold bg-primary text-on-primary hover:scale-105 transition-transform"
+                      >
+                        Join
+                      </button>
+                      <button
+                        onClick={() => handleJoinGroup(group.group_id, true)}
+                        className="flex-1 py-1 rounded-md text-[9px] font-semibold bg-tertiary-container text-on-tertiary-container hover:scale-105 transition-transform"
+                        title="Anonymous Join"
+                      >
+                        Anon
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -356,13 +581,49 @@ export default function DashboardPage() {
             {filteredGroups.length === 0 && (
               <div className="glass-strong rounded-2xl p-12 text-center">
                 <p className="text-4xl mb-3">👥</p>
-                <p className="font-semibold" style={{ color: 'var(--heading)' }}>No groups found</p>
-                <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Create the first group!</p>
+                <p className="font-semibold text-on-surface">No groups found</p>
+                <p className="text-sm mt-1 text-on-surface-variant">Create the first group!</p>
               </div>
             )}
           </>
         )}
       </main>
+
+      {/* Floating Bottom Dock Navigation */}
+      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 flex justify-around items-center p-2 z-50 bg-white/70 dark:bg-surface-container-high/70 rounded-full backdrop-blur-lg border border-white/20 shadow-[0_20px_40px_rgba(0,32,32,0.1)] min-w-[320px]">
+        {/* Chats */}
+        <Link
+          href="/chat"
+          className="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:scale-110 hover:text-primary transition-all duration-300"
+        >
+          <span className="material-symbols-outlined mb-1">chat_bubble</span>
+          <span className="font-bold text-[10px] uppercase tracking-widest">Chats</span>
+        </Link>
+        {/* Groups */}
+        <Link
+          href="/my-groups"
+          className="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:scale-110 hover:text-primary transition-all duration-300"
+        >
+          <span className="material-symbols-outlined mb-1">group</span>
+          <span className="font-bold text-[10px] uppercase tracking-widest">Groups</span>
+        </Link>
+        {/* Home/IDs - Active */}
+        <Link
+          href="/dashboard"
+          className="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-6 py-2 transition-all duration-300"
+        >
+          <span className="material-symbols-outlined mb-1" style={{ fontVariationSettings: "'FILL' 1" }}>badge</span>
+          <span className="font-bold text-[10px] uppercase tracking-widest">IDs</span>
+        </Link>
+        {/* Settings */}
+        <Link
+          href="/profile/edit"
+          className="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:scale-110 hover:text-primary transition-all duration-300"
+        >
+          <span className="material-symbols-outlined mb-1">settings</span>
+          <span className="font-bold text-[10px] uppercase tracking-widest">Settings</span>
+        </Link>
+      </nav>
 
       {/* Create Group Modal */}
       {showCreateGroup && (
