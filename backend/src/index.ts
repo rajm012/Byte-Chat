@@ -2,13 +2,12 @@ import express from 'express';
 import compression from 'compression';
 import type { Express, Request, Response } from 'express';
 import { createServer } from 'http';
-import { timingSafeEqual } from 'crypto';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
-import {getDbFailoverState, getDbPoolMetrics, pool, startDbPoolMonitor} from './lib/db.js';
+import {getDbFailoverState, pool, startDbPoolMonitor} from './lib/db.js';
 import authRoutes from './routes/auth.routes.js';
 import testRoutes from './routes/test.routes.js';
 import profileRoutes from './routes/profile.routes.js';
@@ -24,171 +23,17 @@ import { errorHandler } from './utils/error.util.js';
 import { initializeSocket } from './socket/index.js';
 import { clearPollCache } from './services/pollCache.service.js';
 import { startCacheMetricsLogger } from './utils/cache.util.js';
-import { getAuthCacheMetrics } from './services/authCache.service.js';
 import { startRegularMessagePostCommitWorker } from './services/chat/message-post-commit-queue.service.js';
 
 // Redis connection
-import { connectRedis, redis } from './lib/redis.js';
-
-
+import { connectRedis } from './lib/redis.js';
 const app: Express = express();
 const httpServer = createServer(app);
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value || value.trim() === "") {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
-
-const DB_POOL_DEBUG_PASSWORD = requireEnv('DB_POOL_DEBUG_PASSWORD');
-
-function isDebugPasswordValid(candidate: string): boolean {
-  const expectedBuffer = Buffer.from(DB_POOL_DEBUG_PASSWORD);
-  const candidateBuffer = Buffer.from(candidate);
-  if (expectedBuffer.length !== candidateBuffer.length) {
-    return false;
-  }
-  return timingSafeEqual(expectedBuffer, candidateBuffer);
-}
-
-type RedisSnapshotEntry = {
-  key: string;
-  type: string;
-  ttlSeconds: number;
-  valuePreview: unknown;
-  isTruncated: boolean;
-};
-
-function truncateString(value: string, maxLength = 500): string {
-  if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength)}...<truncated>`;
-}
-
-async function getRedisValuePreview(key: string, keyType: string, includeFullValues: boolean,
-): Promise<{ valuePreview: unknown; isTruncated: boolean }> {
-  switch (keyType) {
-    case 'string': {
-      const value = await redis.get(key);
-      if (typeof value !== 'string') {
-        return { valuePreview: value, isTruncated: false };
-      }
-      const truncated = truncateString(value);
-      return {
-        valuePreview: includeFullValues ? value : truncated,
-        isTruncated: !includeFullValues && truncated !== value,
-      };
-    }
-    case 'hash': {
-      const value = await redis.hgetall(key);
-      return { valuePreview: value, isTruncated: false };
-    }
-    case 'list': {
-      const value = includeFullValues ? await redis.lrange(key, 0, -1) : await redis.lrange(key, 0, 50);
-      return {
-        valuePreview: value.map((item) => includeFullValues ? item : truncateString(item)),
-        isTruncated: !includeFullValues,
-      };
-    }
-    case 'set': {
-      const value = await redis.smembers(key);
-      if (includeFullValues) {
-        return { valuePreview: value, isTruncated: false };
-      }
-      return {
-        valuePreview: value.slice(0, 50).map((item) => truncateString(item)),
-        isTruncated: value.length > 50,
-      };
-    }
-    case 'zset': {
-      const value = includeFullValues
-        ? await redis.zrange(key, 0, -1, 'WITHSCORES')
-        : await redis.zrange(key, 0, 50, 'WITHSCORES');
-      return {
-        valuePreview: value.map((item) => includeFullValues ? item : truncateString(item)),
-        isTruncated: !includeFullValues,
-      };
-    }
-    case 'stream': {
-      const value = includeFullValues
-        ? await redis.xrange(key, '-', '+')
-        : await redis.xrange(key, '-', '+', 'COUNT', 20);
-      return {
-        valuePreview: value,
-        isTruncated: !includeFullValues,
-      };
-    }
-    default:
-      return { valuePreview: null, isTruncated: false };
-  }
-}
-
-async function buildRedisSnapshot(pattern: string, limit: number, includeFullValues: boolean,
-): Promise<{ entries: RedisSnapshotEntry[]; isCapped: boolean }> {
-  let cursor = '0';
-  const discovered = new Set<string>();
-
-  do {
-    const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 200);
-    cursor = nextCursor;
-    for (const key of keys) {
-      discovered.add(key);
-      if (discovered.size >= limit) break;
-    }
-  } while (cursor !== '0' && discovered.size < limit);
-
-  const selectedKeys = Array.from(discovered).slice(0, limit);
-  const isCapped = cursor !== '0';
-  const entries = await Promise.all(
-    selectedKeys.map(async (key): Promise<RedisSnapshotEntry> => {
-      try {
-        const [keyType, ttlMs] = await Promise.all([
-          redis.type(key),
-          redis.pttl(key),
-        ]);
-        const ttlSeconds = ttlMs > 0 ? Math.floor(ttlMs / 1000) : ttlMs;
-        const { valuePreview, isTruncated } = await getRedisValuePreview(key, keyType, includeFullValues);
-        return {
-          key,
-          type: keyType,
-          ttlSeconds,
-          valuePreview,
-          isTruncated,
-        };
-      } catch (error) {
-        return {
-          key,
-          type: 'unknown',
-          ttlSeconds: -3,
-          valuePreview: {
-            error: error instanceof Error ? error.message : 'Unable to read key',
-          },
-          isTruncated: false,
-        };
-      }
-    })
-  );
-
-  return {
-    entries: entries.sort((a, b) => a.key.localeCompare(b.key)),
-    isCapped,
-  };
-}
 
 // Connect to Redis at server startup
 connectRedis();
 startCacheMetricsLogger();
 startDbPoolMonitor();
-// Redis test endpoint
-app.get('/redis-test', async (req: Request, res: Response) => {
-  try {
-    await redis.set('test_key', 'hello_from_backend');
-    const value = await redis.get('test_key');
-    res.json({ redis_value: value });
-  } catch (err) {
-    res.status(500).json({ error: 'Redis error', details: (err as Error).message });
-  }
-});
 
 
 // HTTP compression (skip binary/media types)
@@ -292,96 +137,6 @@ app.get('/health', async (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     db: {
       failoverState: dbFailoverState,
-    },
-  });
-});
-
-// Debug endpoint for DB pool metrics stored in Redis.
-// Disabled in production to avoid exposing internal runtime details.
-app.get('/debug/db-pool-metrics', async (req: Request, res: Response) => {
-  if (config.server.nodeEnv === 'production') {
-    return res.status(404).json({ success: false, message: 'Route not found' });
-  }
-
-  const passwordHeader = req.headers['x-debug-password'];
-  const submittedPassword = typeof passwordHeader === 'string' ? passwordHeader : '';
-
-  if (!isDebugPasswordValid(submittedPassword)) {
-    return res.status(401).json({ success: false, message: 'Unauthorized' });
-  }
-
-  const [failoverState, metrics] = await Promise.all([
-    getDbFailoverState(),
-    getDbPoolMetrics(),
-  ]);
-
-  return res.status(200).json({
-    success: true,
-    data: {
-      failoverState,
-      metrics,
-    },
-  });
-});
-
-app.get('/debug/redis-snapshot', async (req: Request, res: Response) => {
-  if (config.server.nodeEnv === 'production') {
-    return res.status(404).json({ success: false, message: 'Route not found' });
-  }
-
-  const passwordHeader = req.headers['x-debug-password'];
-  const submittedPassword = typeof passwordHeader === 'string' ? passwordHeader : '';
-
-  if (!isDebugPasswordValid(submittedPassword)) {
-    return res.status(401).json({ success: false, message: 'Unauthorized' });
-  }
-
-  const patternRaw = typeof req.query.pattern === 'string' && req.query.pattern.trim() ? req.query.pattern.trim() : '*';
-  const limitRaw = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 200;
-  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 20000) : 200;
-  const includeFullValues = req.query.full === '1' || req.query.full === 'true';
-
-  try {
-    const { entries, isCapped } = await buildRedisSnapshot(patternRaw, limit, includeFullValues);
-    return res.status(200).json({
-      success: true,
-      data: {
-        snapshotAt: new Date().toISOString(),
-        pattern: patternRaw,
-        limit,
-        includeFullValues,
-        isCapped,
-        totalKeys: entries.length,
-        entries,
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to build Redis snapshot',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-app.get('/debug/auth-cache-metrics', async (req: Request, res: Response) => {
-  if (config.server.nodeEnv === 'production') {
-    return res.status(404).json({ success: false, message: 'Route not found' });
-  }
-
-  const passwordHeader = req.headers['x-debug-password'];
-  const submittedPassword = typeof passwordHeader === 'string' ? passwordHeader : '';
-
-  if (!isDebugPasswordValid(submittedPassword)) {
-    return res.status(401).json({ success: false, message: 'Unauthorized' });
-  }
-
-  const metrics = await getAuthCacheMetrics();
-  return res.status(200).json({
-    success: true,
-    data: {
-      snapshotAt: new Date().toISOString(),
-      metrics,
     },
   });
 });

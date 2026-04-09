@@ -198,15 +198,6 @@ export default function DashboardPage() {
                 {theme === 'light' ? '🌙' : '☀️'}
               </button>
             )}
-            <Link
-              href="/redis-monitor"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-2 rounded-xl text-xs font-semibold glass transition-all hover:scale-105"
-              style={{ color: 'var(--muted)' }}
-            >
-              Redis
-            </Link>
           </nav>
         </div>
       </header>

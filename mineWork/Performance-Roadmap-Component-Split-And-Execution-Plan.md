@@ -78,15 +78,6 @@ Refactor send flow:
   - unread_count per user+conversation
 - Keep fallback recompute for repair paths.
 
-### C) Notification storage redesign
-Replace list rewrite model with:
-- hash: notification:<id>
-- zset: notifications:user:<userId>
-- set/zset index per conversation
-
-Result:
-- O(log n) style deletes and clears without full list rewrite.
-
 ### D) Profile Edit Split (from frontend/src/app/profile/edit/page.tsx)
 Create:
 - hooks/useProfileSettingsData.ts
