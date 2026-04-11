@@ -9,7 +9,6 @@ import { ReportGroupButton } from '@/components/ModerationComponents';
 import { useToast } from '@/contexts/ToastContext';
 import Image from 'next/image';
 
-
 interface GroupMember {
   member_id: string;
   user_id: string;
@@ -53,15 +52,13 @@ export default function GroupDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'info' | 'members'>('info');
 
   const fetchGroupData = useCallback(async () => {
     try {
-      // Fetch group details
       const groupResponse = await groupService.getGroupDetails(groupId);
       if (groupResponse.success && groupResponse.data) {
         setGroup(groupResponse.data.group);
-
-        // If user is a member, fetch members list
         if (groupResponse.data.group.is_member) {
           const membersResponse = await groupService.getGroupMembers(groupId);
           if (membersResponse.success && membersResponse.data) {
@@ -69,16 +66,14 @@ export default function GroupDetailsPage() {
           }
         }
       }
-    }
-    catch (err: unknown) {
-      let errorMsg = '[ERROR] Failed to fetch group data';
+    } catch (err: unknown) {
+      let errorMsg = 'Failed to fetch group data';
       if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as { message?: string }).message === 'string') {
         errorMsg = (err as { message: string }).message;
       }
       setError(errorMsg);
       toast.error(errorMsg);
-    }
-    finally {
+    } finally {
       setLoading(false);
     }
   }, [groupId, toast]);
@@ -91,222 +86,346 @@ export default function GroupDetailsPage() {
     try {
       await groupService.joinGroup(groupId, isAnonymous);
       fetchGroupData();
-    } 
-    catch (err: unknown) {
-      let errorMsg = 'Failed to join group'
+      toast.success(isAnonymous ? 'Joined anonymously!' : 'Joined group!');
+    } catch (err: unknown) {
+      let errorMsg = 'Failed to join group';
       if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as { message?: string }).message === 'string') {
         errorMsg = (err as { message: string }).message;
       }
-      setError(errorMsg);
       toast.error(errorMsg);
     }
   };
 
   const handleLeaveGroup = async () => {
-    if (!confirm('Are you sure you want to leave this group?')) {
-      return;
-    }
-
+    if (!confirm('Are you sure you want to leave this group?')) return;
     try {
       await groupService.leaveGroup(groupId);
-      router.push('/dashboard');
-    } 
-    catch (err: unknown) {
-      let errorMsg = 'Failed to leave group'
+      router.push('/my-groups');
+    } catch (err: unknown) {
+      let errorMsg = 'Failed to leave group';
       if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as { message?: string }).message === 'string') {
         errorMsg = (err as { message: string }).message;
       }
-      setError(errorMsg);
       toast.error(errorMsg);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-mesh-warm flex items-center justify-center">
-        <div className="text-center animate-fade-in">
-          <div className="w-16 h-16 rounded-full border-4 border-transparent mx-auto mb-4 animate-spin"
-            style={{ borderTopColor: 'var(--pink)', borderRightColor: 'var(--coral)' }} />
-          <p className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Loading group…</p>
-        </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#002020]/40 backdrop-blur-md">
+        <div className="w-16 h-16 rounded-full border-4 border-[#87ceeb] border-t-transparent animate-spin" />
       </div>
     );
   }
 
   if (error || !group) {
     return (
-      <div className="min-h-screen bg-mesh-warm flex items-center justify-center p-6">
-        <div className="glass-strong rounded-3xl p-12 text-center max-w-md animate-scale-in">
-          <div className="text-5xl mb-4">❌</div>
-          <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--heading)' }}>{error || 'Group not found'}</h2>
-          <Link href="/dashboard" className="btn-romance mt-6 inline-block">← Back to Dashboard</Link>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#002020]/40 backdrop-blur-md p-4">
+        <div className="bg-white dark:bg-[#003535] rounded-3xl p-8 text-center max-w-sm shadow-2xl">
+          <div className="text-4xl mb-4">😕</div>
+          <p className="font-semibold mb-6 text-[#002020] dark:text-[#e7fffe]">{error || 'Group not found'}</p>
+          <button 
+            onClick={() => router.back()} 
+            className="px-6 py-2.5 bg-linear-to-r from-[#87ceeb] via-[#e6e6fa] to-[#ffb6c1] text-[#002020] rounded-xl font-semibold hover:opacity-90 transition-opacity"
+          >
+            Go Back
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-mesh-warm antialiased">
-      {/* Blobs */}
-      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-linear-to-br from-cyan-300/15 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-[-5%] left-[-3%] w-80 h-80 bg-linear-to-br from-blue-300/10 to-transparent rounded-full blur-3xl" />
-      </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 lg:p-12 bg-black/40 backdrop-blur-md dark:bg-black/60">
+      {/* Modal Container */}
+      <div className="relative w-full max-w-5xl h-[85vh] md:h-[75vh] bg-white dark:bg-[#003535] rounded-3xl shadow-[0_40px_80px_rgba(0,32,32,0.2)] dark:shadow-[0_40px_80px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden">
+        {/* Close Button */}
+        <button 
+          onClick={() => router.back()}
+          className="absolute top-6 right-6 z-20 w-12 h-12 flex items-center justify-center rounded-full bg-white text-[#002020] hover:bg-gray-100 transition-all duration-300 shadow-lg active:scale-90 dark:bg-[#004a4a] dark:text-white dark:hover:bg-[#005555]"
+        >
+          <span className="material-symbols-outlined text-3xl">close</span>
+        </button>
 
-      {/* Nav */}
-      <header className="glass-nav sticky top-0 z-50 px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/dashboard" className="btn-ghost px-3 py-2 text-sm shrink-0">← Back</Link>
-            <div className="flex items-center gap-3 min-w-0">
-              {group.group_dp_url ? (
-                <Image src={group.group_dp_url} alt={group.group_name} width={40} height={40}
-                  className="w-10 h-10 rounded-xl object-cover ring-2 ring-white/20 shrink-0" />
-              ) : (
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shrink-0"
-                  style={{ background: 'var(--grad-ocean)' }}>
-                  {group.group_name.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div className="min-w-0">
-                <h1 className="text-lg font-bold truncate heading-romance">{group.group_name}</h1>
-                <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
-                  by {group.creator_name} · {group.member_count}/{group.max_members} members
-                </p>
+        {/* Content Canvas */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          {/* Left Column: Visual Group Image */}
+          <div className="w-full md:w-5/12 relative h-64 md:h-full bg-[#e2fffe] dark:bg-[#002020] overflow-hidden">
+            {group.group_dp_url ? (
+              <Image 
+                src={group.group_dp_url} 
+                alt={group.group_name}
+                fill
+                className="object-cover"
+                priority
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-[#87ceeb] to-[#0c6780]">
+                <span className="text-6xl font-bold text-white">{group.group_name?.charAt(0).toUpperCase() || 'G'}</span>
               </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {group.is_member && (group.user_is_admin || group.user_is_owner) && (
-              <>
-                <button onClick={() => setShowEditModal(true)} className="btn-ghost px-4 py-2 text-sm">Edit</button>
-                <Link href={`/groups/${groupId}/manage`} className="btn-purple px-4 py-2 text-sm">Manage</Link>
-              </>
             )}
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-
-        {/* Group Info Card */}
-        <div className="glass-strong rounded-3xl p-7 animate-fade-in">
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <div className="flex items-center gap-4">
-              {group.group_dp_url ? (
-                <Image src={group.group_dp_url} alt={group.group_name} width={72} height={72}
-                  className="w-18 h-18 rounded-2xl object-cover ring-2 ring-white/20 shrink-0" />
-              ) : (
-                <div className="w-18 h-18 rounded-2xl flex items-center justify-center text-3xl font-bold text-white shrink-0"
-                  style={{ background: 'var(--grad-ocean)', width: 72, height: 72 }}>
-                  {group.group_name.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div>
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <h2 className="text-2xl font-bold" style={{ color: 'var(--heading)' }}>{group.group_name}</h2>
-                  <span className={`px-3 py-0.5 rounded-full text-xs font-semibold ${
-                    group.is_public ? 'bg-emerald-500/15 text-emerald-400' : 'bg-orange-500/15 text-orange-400'
-                  }`}>
-                    {group.is_public ? '🌐 Public' : '🔒 Private'}
-                  </span>
-                </div>
-                {group.group_desc && (
-                  <p className="text-sm" style={{ color: 'var(--muted)' }}>{group.group_desc}</p>
-                )}
+            {/* Gradient overlay at bottom */}
+            <div className="absolute bottom-0 left-0 right-0 p-8 bg-linear-to-t from-black/80 to-transparent">
+              <div className="flex items-center gap-3">
+                <span className={`w-3 h-3 rounded-full border-2 border-white shadow-lg ${group.is_public ? 'bg-emerald-400' : 'bg-orange-400'}`} />
+                <span className="text-white font-medium text-xs uppercase tracking-widest">
+                  {group.is_public ? 'Public Group' : 'Private Group'}
+                </span>
               </div>
+              <h2 className="text-white text-3xl md:text-4xl font-bold mt-2 tracking-tight">{group.group_name}</h2>
+              <p className="text-white/80 text-lg">by {group.creator_name}</p>
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            {[
-              { label: 'Members', value: `${group.member_count}/${group.max_members}` },
-              { label: 'Created', value: new Date(group.created_at).toLocaleDateString() },
-              { label: 'Type', value: group.is_public ? 'Public' : 'Private' },
-            ].map(s => (
-              <div key={s.label} className="glass rounded-2xl p-4 text-center">
-                <p className="text-base font-bold mb-0.5" style={{ color: 'var(--heading)' }}>{s.value}</p>
-                <p className="text-xs" style={{ color: 'var(--muted)' }}>{s.label}</p>
-              </div>
-            ))}
-          </div>
+          {/* Right Column: Info & Actions */}
+          <div className="w-full md:w-7/12 flex flex-col overflow-hidden">
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 dark:border-[#004a4a]">
+              <button
+                onClick={() => setActiveTab('info')}
+                className={`flex-1 py-4 text-sm font-semibold transition-colors ${
+                  activeTab === 'info' 
+                    ? 'text-[#0c6780] dark:text-[#87ceeb] border-b-2 border-[#87ceeb]' 
+                    : 'text-[#6f787d] dark:text-[#bfc8cd] hover:text-[#0c6780]'
+                }`}
+              >
+                <span className="material-symbols-outlined mr-2">info</span>
+                Info
+              </button>
+              <button
+                onClick={() => setActiveTab('members')}
+                className={`flex-1 py-4 text-sm font-semibold transition-colors ${
+                  activeTab === 'members' 
+                    ? 'text-[#0c6780] dark:text-[#87ceeb] border-b-2 border-[#87ceeb]' 
+                    : 'text-[#6f787d] dark:text-[#bfc8cd] hover:text-[#0c6780]'
+                }`}
+              >
+                <span className="material-symbols-outlined mr-2">group</span>
+                Members ({group.member_count})
+              </button>
+            </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 flex-wrap">
-            {!group.is_member && group.is_public && (
-              <>
-                <button onClick={() => handleJoinGroup(false)} className="btn-romance px-6 py-3 text-sm font-semibold flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                  </svg>
-                  Join Group
-                </button>
-                <button onClick={() => handleJoinGroup(true)} className="btn-purple px-6 py-3 text-sm font-semibold flex items-center gap-2">
-                  🎭 Join Anonymously
-                </button>
-              </>
-            )}
-            {group.is_member && (
-              <>
-                <Link href={`/groups/${groupId}/chat`} className="btn-romance px-6 py-3 text-sm font-semibold flex items-center gap-2">
-                  💬 Open Chat
-                </Link>
-                <button onClick={handleLeaveGroup} className="px-6 py-3 rounded-2xl text-sm font-semibold glass transition-all hover:scale-105 flex items-center gap-2" style={{ color: '#EF4444' }}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  Leave Group
-                </button>
-              </>
-            )}
-            {group && (
-              <ReportGroupButton groupId={group.group_id} groupName={group.group_name} />
-            )}
-          </div>
-        </div>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-10">
+              {activeTab === 'info' ? (
+                <div className="space-y-8">
+                  {/* Description */}
+                  {group.group_desc && (
+                    <div className="space-y-3">
+                      <h3 className="text-[#6f787d] dark:text-[#bfc8cd] font-medium text-[10px] uppercase tracking-[0.2em] flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm">description</span>
+                        About
+                      </h3>
+                      <p className="text-[#002020] dark:text-[#e7fffe] text-lg leading-relaxed">{group.group_desc}</p>
+                    </div>
+                  )}
 
-        {/* Members List */}
-        {group.is_member && members.length > 0 && (
-          <div className="glass-strong rounded-3xl p-7 animate-fade-in" style={{ animationDelay: '100ms' }}>
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'var(--heading)' }}>
-              <span>👥</span> Members <span className="text-base font-normal" style={{ color: 'var(--muted)' }}>({members.length})</span>
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {members.map((member) => (
-                <div key={member.member_id} className="glass rounded-2xl p-4">
-                  <div className="flex items-center gap-3">
-                    {member.dp_url && !member.is_anonymous ? (
-                      <Image src={member.dp_url} alt={member.name} width={44} height={44}
-                        className="w-11 h-11 rounded-full object-cover ring-2 ring-white/20 shrink-0" />
-                    ) : (
-                      <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base shrink-0"
-                        style={{ background: member.is_anonymous ? 'var(--grad-mystery)' : 'var(--grad-romance)' }}>
-                        {(member.is_anonymous ? member.anonymous_name : member.name)?.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                        <span className="font-semibold text-sm truncate" style={{ color: 'var(--heading)' }}>
-                          {member.is_anonymous ? member.anonymous_name : member.name}
-                        </span>
-                        {member.is_owner && <span className="px-1.5 py-0.5 rounded text-xs bg-purple-500/15 text-purple-400">👑</span>}
-                        {member.is_admin && !member.is_owner && <span className="px-1.5 py-0.5 rounded text-xs bg-blue-500/15 text-blue-400">🛡️</span>}
-                        {member.is_anonymous && <span className="px-1.5 py-0.5 rounded text-xs bg-white/10 text-gray-400">🎭</span>}
-                      </div>
-                      <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
-                        {member.is_anonymous
-                          ? `${member.anonymous_gender} · Anonymous`
-                          : `${member.roll_no} · ${member.branch}`}
+                  {/* Stats Bento Grid */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-[#e2fffe] dark:bg-[#004040] p-5 rounded-2xl">
+                      <span className="text-[#6f787d] dark:text-[#bfc8cd] font-medium text-[10px] uppercase tracking-[0.2em]">Members</span>
+                      <p className="text-[#002020] dark:text-[#e7fffe] font-bold text-xl mt-1">{group.member_count} / {group.max_members}</p>
+                    </div>
+                    <div className="bg-[#e2fffe] dark:bg-[#004040] p-5 rounded-2xl">
+                      <span className="text-[#6f787d] dark:text-[#bfc8cd] font-medium text-[10px] uppercase tracking-[0.2em]">Created</span>
+                      <p className="text-[#002020] dark:text-[#e7fffe] font-bold text-xl mt-1">{new Date(group.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
+                    </div>
+                    <div className="bg-[#e2fffe] dark:bg-[#004040] p-5 rounded-2xl">
+                      <span className="text-[#6f787d] dark:text-[#bfc8cd] font-medium text-[10px] uppercase tracking-[0.2em]">Created By</span>
+                      <p className="text-[#002020] dark:text-[#e7fffe] font-bold text-xl mt-1 truncate">{group.creator_roll_no}</p>
+                    </div>
+                    <div className="bg-[#e2fffe] dark:bg-[#004040] p-5 rounded-2xl">
+                      <span className="text-[#6f787d] dark:text-[#bfc8cd] font-medium text-[10px] uppercase tracking-[0.2em]">Your Role</span>
+                      <p className="text-[#002020] dark:text-[#e7fffe] font-bold text-xl mt-1">
+                        {group.user_is_owner ? 'Owner' : group.user_is_admin ? 'Admin' : group.is_member ? 'Member' : 'Not Joined'}
                       </p>
                     </div>
                   </div>
+
+                  {/* Badges */}
+                  <div className="flex flex-wrap gap-3">
+                    {group.is_public ? (
+                      <span className="px-4 py-2 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-medium text-sm flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">public</span>
+                        Public
+                      </span>
+                    ) : (
+                      <span className="px-4 py-2 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 font-medium text-sm flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">lock</span>
+                        Private
+                      </span>
+                    )}
+                    {group.user_is_owner && (
+                      <span className="px-4 py-2 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-medium text-sm flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">crown</span>
+                        Owner
+                      </span>
+                    )}
+                    {group.user_is_admin && !group.user_is_owner && (
+                      <span className="px-4 py-2 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium text-sm flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">shield</span>
+                        Admin
+                      </span>
+                    )}
+                  </div>
                 </div>
-              ))}
+              ) : (
+                /* Members List */
+                <div className="space-y-4">
+                  {members.length === 0 ? (
+                    <div className="text-center py-12">
+                      <span className="material-symbols-outlined text-4xl text-[#6f787d] dark:text-[#bfc8cd] mb-2">group_off</span>
+                      <p className="text-[#6f787d] dark:text-[#bfc8cd]">No members to display</p>
+                    </div>
+                  ) : (
+                    members.map((member) => (
+                      <div key={member.member_id} className="flex items-center gap-4 p-4 bg-[#f5f5f5] dark:bg-[#004040] rounded-2xl">
+                        {member.dp_url && !member.is_anonymous ? (
+                          <Image 
+                            src={member.dp_url} 
+                            alt={member.name} 
+                            width={48} 
+                            height={48}
+                            className="w-12 h-12 rounded-full object-cover" 
+                          />
+                        ) : (
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${
+                            member.is_anonymous 
+                              ? 'bg-linear-to-br from-gray-500 to-gray-700' 
+                              : 'bg-linear-to-br from-[#87ceeb] to-[#ffb6c1]'
+                          }`}>
+                            {(member.is_anonymous ? member.anonymous_name : member.name)?.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-[#002020] dark:text-[#e7fffe] truncate">
+                              {member.is_anonymous ? member.anonymous_name : member.name}
+                            </span>
+                            {member.is_owner && (
+                              <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-xs">crown</span>
+                                Owner
+                              </span>
+                            )}
+                            {member.is_admin && !member.is_owner && (
+                              <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-xs">shield</span>
+                                Admin
+                              </span>
+                            )}
+                            {member.is_anonymous && (
+                              <span className="px-2 py-0.5 rounded-full text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                                Anonymous
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-[#6f787d] dark:text-[#bfc8cd]">
+                            {member.is_anonymous 
+                              ? member.anonymous_gender 
+                              : `${member.roll_no} · ${member.branch}`}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="p-6 border-t border-gray-200 dark:border-[#004a4a]">
+              {!group.is_member && group.is_public && (
+                <div className="grid grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => handleJoinGroup(false)}
+                    className="bg-[#0c6780] h-14 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95 text-white font-bold text-lg dark:bg-[#87ceeb] dark:text-[#002020]"
+                  >
+                    <span className="material-symbols-outlined">login</span>
+                    Join
+                  </button>
+                  <button 
+                    onClick={() => handleJoinGroup(true)}
+                    className="bg-[#e2fffe] dark:bg-[#004040] h-14 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95 text-[#002020] dark:text-[#e7fffe] font-bold text-lg border-2 border-[#87ceeb]"
+                  >
+                    <span className="material-symbols-outlined">incognito</span>
+                    Anonymous
+                  </button>
+                </div>
+              )}
+              
+              {group.is_member && (
+                <div className="grid grid-cols-2 gap-4">
+                  <Link href={`/groups/${groupId}/chat`}>
+                    <button className="w-full bg-[#0c6780] h-14 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95 text-white font-bold text-lg dark:bg-[#87ceeb] dark:text-[#002020]">
+                      <span className="material-symbols-outlined">chat</span>
+                      Chat
+                    </button>
+                  </Link>
+                  <button 
+                    onClick={handleLeaveGroup}
+                    className="bg-red-100 dark:bg-red-900/30 h-14 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95 text-red-600 dark:text-red-400 font-bold text-lg"
+                  >
+                    <span className="material-symbols-outlined">logout</span>
+                    Leave
+                  </button>
+                </div>
+              )}
+
+              {!group.is_member && !group.is_public && (
+                <div className="text-center py-4">
+                  <p className="text-[#6f787d] dark:text-[#bfc8cd]">
+                    This is a private group. You need an invitation to join.
+                  </p>
+                </div>
+              )}
+
+              {/* Admin Actions */}
+              {group.is_member && (group.user_is_admin || group.user_is_owner) && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#004a4a] grid grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => setShowEditModal(true)}
+                    className="bg-[#e2fffe] dark:bg-[#004040] h-12 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-md text-[#0c6780] dark:text-[#87ceeb] font-semibold"
+                  >
+                    <span className="material-symbols-outlined">edit</span>
+                    Edit Group
+                  </button>
+                  <Link href={`/groups/${groupId}/manage`} className="w-full">
+                    <button className="w-full bg-[#e2fffe] dark:bg-[#004040] h-12 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-md text-[#0c6780] dark:text-[#87ceeb] font-semibold">
+                      <span className="material-symbols-outlined">settings</span>
+                      Manage
+                    </button>
+                  </Link>
+                </div>
+              )}
+
+              {/* Report Button */}
+              <div className="mt-4 flex justify-center">
+                <ReportGroupButton groupId={group.group_id} groupName={group.group_name} />
+              </div>
             </div>
           </div>
-        )}
-      </main>
+        </div>
+      </div>
+
+      {/* Floating Bottom Dock Navigation */}
+      <nav className="fixed bottom-2 left-1/2 -translate-x-1/2 flex justify-center items-center gap-1 p-1.5 z-50 rounded-full backdrop-blur-md border shadow-[0_8px_24px_rgba(0,0,0,0.12)] bg-white/90 border-[#d2f5f4] dark:bg-[#003535]/90 dark:border-[#004a4a] dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
+        <Link href="/chat" className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]" title="Chats">
+          <span className="material-symbols-outlined text-xl">chat_bubble</span>
+        </Link>
+        <Link href="/my-groups" className="w-12 h-12 flex items-center justify-center bg-[#87ceeb]/20 text-[#0c6780] rounded-full transition-all duration-300 ring-2 ring-[#87ceeb]/40 dark:bg-[#0c6780]/20 dark:text-[#87ceeb] dark:ring-[#0c6780]/40" title="Groups">
+          <span className="material-symbols-outlined text-xl">group</span>
+        </Link>
+        <Link href="/dashboard" className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]" title="Home">
+          <span className="material-symbols-outlined text-xl">home</span>
+        </Link>
+        <Link href="/my-identities" className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]" title="IDs">
+          <span className="material-symbols-outlined text-xl">badge</span>
+        </Link>
+        <Link href="/profile/edit" className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]" title="Settings">
+          <span className="material-symbols-outlined text-xl">settings</span>
+        </Link>
+      </nav>
 
       {/* Edit Modal */}
       {showEditModal && group && (
@@ -354,29 +473,38 @@ function EditGroupModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="glass-strong rounded-3xl p-8 max-w-md w-full animate-scale-in">
+      <div className="bg-white dark:bg-[#003535] rounded-3xl p-8 max-w-md w-full shadow-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold heading-romance">Edit Group</h2>
-          <button onClick={onClose} className="btn-ghost w-9 h-9 rounded-full flex items-center justify-center">✕</button>
+          <h2 className="text-xl font-bold text-[#002020] dark:text-[#e7fffe]">Edit Group</h2>
+          <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-[#004040] transition-colors">
+            <span className="material-symbols-outlined text-[#6f787d]">close</span>
+          </button>
         </div>
         {error && (
-          <div className="glass rounded-2xl p-3 mb-5 border border-red-400/30 bg-red-500/10 text-red-400 text-sm">{error}</div>
+          <div className="rounded-2xl p-3 mb-5 border border-red-400/30 bg-red-500/10 text-red-400 text-sm">{error}</div>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--body)' }}>Group Name*</label>
-            <input type="text" required value={formData.group_name}
+            <label className="block text-sm font-medium mb-2 text-[#6f787d] dark:text-[#bfc8cd]">Group Name*</label>
+            <input 
+              type="text" 
+              required 
+              value={formData.group_name}
               onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
-              className="input-romance w-full" />
+              className="w-full px-4 py-3 rounded-xl bg-[#f5f5f5] dark:bg-[#004040] border-none text-[#002020] dark:text-[#e7fffe] focus:ring-2 focus:ring-[#87ceeb] outline-none"
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--body)' }}>Description</label>
-            <textarea value={formData.group_desc}
+            <label className="block text-sm font-medium mb-2 text-[#6f787d] dark:text-[#bfc8cd]">Description</label>
+            <textarea 
+              value={formData.group_desc}
               onChange={(e) => setFormData({ ...formData, group_desc: e.target.value })}
-              className="input-romance w-full resize-none" rows={3} />
+              className="w-full px-4 py-3 rounded-xl bg-[#f5f5f5] dark:bg-[#004040] border-none text-[#002020] dark:text-[#e7fffe] focus:ring-2 focus:ring-[#87ceeb] outline-none resize-none" 
+              rows={3} 
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--body)' }}>Group Picture</label>
+            <label className="block text-sm font-medium mb-2 text-[#6f787d] dark:text-[#bfc8cd]">Group Picture</label>
             <GroupImageManager
               groupId={group.group_id}
               isAdmin={group.user_is_admin || group.user_is_owner}
@@ -386,17 +514,33 @@ function EditGroupModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--body)' }}>
+            <label className="block text-sm font-medium mb-2 text-[#6f787d] dark:text-[#bfc8cd]">
               Max Members (2–500)
             </label>
-            <input type="number" required min={group.member_count} max={500} value={formData.max_members}
+            <input 
+              type="number" 
+              required 
+              min={group.member_count} 
+              max={500} 
+              value={formData.max_members}
               onChange={(e) => setFormData({ ...formData, max_members: parseInt(e.target.value) })}
-              className="input-romance w-full" />
-            <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Current members: {group.member_count}</p>
+              className="w-full px-4 py-3 rounded-xl bg-[#f5f5f5] dark:bg-[#004040] border-none text-[#002020] dark:text-[#e7fffe] focus:ring-2 focus:ring-[#87ceeb] outline-none"
+            />
+            <p className="text-xs mt-1 text-[#6f787d] dark:text-[#bfc8cd]">Current members: {group.member_count}</p>
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancel</button>
-            <button type="submit" disabled={loading} className="btn-romance flex-1">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-[#004040] text-[#6f787d] dark:text-[#bfc8cd] font-semibold hover:bg-gray-200 dark:hover:bg-[#005555] transition-colors"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={loading} 
+              className="flex-1 py-3 rounded-xl bg-linear-to-r from-[#87ceeb] to-[#ffb6c1] text-[#002020] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
               {loading ? 'Saving…' : 'Save Changes'}
             </button>
           </div>

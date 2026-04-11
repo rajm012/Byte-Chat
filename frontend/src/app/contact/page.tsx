@@ -62,7 +62,7 @@ const developers: Developer[] = [
     name: 'Raj Maurya',
     role: 'Backend Developer',
     avatar: 'https://ui-avatars.com/api/?name=Raj+Maurya&background=8b5cf6&color=fff&size=200&bold=true',
-    bio: 'Building scalable APIs and real-time communication systems. Developing backend services, implementing WebSocket connections, and ensuring smooth server-side operations.',
+    bio: 'I do, what I do.',
     email: 'b23406@students.iitmandi.ac.in',
     expertise: ['Express.js', 'Socket.io', 'Real-time Communication'],
     color: 'purple',

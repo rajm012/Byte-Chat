@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/services/auth.service';
 import { DEGREE_TYPE_OPTIONS, DegreeType } from '@/types/auth.types';
@@ -95,9 +95,15 @@ const Spinner = () => (
 // ────────────────────────────────────────────────────────────────
 export default function AuthPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'signup' ? 'signup' : 'login';
-  const [activeTab, setActiveTab] = useState<'login' | 'signup'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setActiveTab(params.get('tab') === 'signup' ? 'signup' : 'login');
+    const onPop = () => setActiveTab(new URLSearchParams(window.location.search).get('tab') === 'signup' ? 'signup' : 'login');
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   const [step, setStep] = useState<'form' | 'verify'>('form');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

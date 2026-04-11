@@ -23,7 +23,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImageDelete,
   isLoading = false,
   aspectRatio = 1,
-  title = 'Upload Image',
+  // title = 'Upload Image',
   showDelete = true,
 }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -166,7 +166,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   return (
     <div className="w-full">
-      <h3 className="text-lg font-semibold mb-4">{title}</h3>
+      {/* title removed — keep only icon/header from parent component per design */}
 
       {/* Current Image Display */}
       {!showEditor && currentImage && (

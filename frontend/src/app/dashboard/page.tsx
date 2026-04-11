@@ -5,10 +5,46 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { User, Group } from '@/types/chat.types';
 import { groupService } from '@/services/group.service';
+import { uploadGroupPicture } from '@/services/image.service';
 import { useToast } from '@/contexts/ToastContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import Image from 'next/image';
 import './dashboard.css';
+import type { AppNotification } from '@/services/notification.service';
+
+// Helper to resolve notification navigation link
+function resolveNotificationLink(notification: AppNotification): string | undefined {
+  const n = notification as Record<string, unknown>;
+  const type = typeof n.type === 'string' ? n.type : 'notification';
+  const conversationId =
+    (typeof n.conversationId === 'string' ? n.conversationId : undefined) ||
+    (typeof n.conversation_id === 'string' ? n.conversation_id : undefined) ||
+    (typeof n.chatId === 'string' ? n.chatId : undefined) ||
+    (typeof n.chat_id === 'string' ? n.chat_id : undefined);
+  const groupId =
+    (typeof n.groupId === 'string' ? n.groupId : undefined) ||
+    (typeof n.group_id === 'string' ? n.group_id : undefined);
+  const pollId =
+    (typeof n.pollId === 'string' ? n.pollId : undefined) ||
+    (typeof n.poll_id === 'string' ? n.poll_id : undefined);
+
+  if (type === 'group_invite') {
+    return groupId ? `/groups/${groupId}/chat` : '/my-groups';
+  }
+  if (type === 'admin_promoted') {
+    return groupId ? `/groups/${groupId}` : '/my-groups';
+  }
+  if (type === 'poll_created') {
+    return groupId ? `/groups/${groupId}/chat${pollId ? `?pollId=${pollId}` : ''}` : '/my-groups';
+  }
+  if (conversationId) {
+    return `/chat/${conversationId}`;
+  }
+  if (groupId) {
+    return `/groups/${groupId}`;
+  }
+  return undefined;
+}
 
 function useDarkMode() {
   const [dark, setDark] = useState(() => {
@@ -34,7 +70,7 @@ function useDarkMode() {
 export default function DashboardPage() {
   const router = useRouter();
   const toast = useToast();
-  const { notifications, count: notificationCount, markRead, deleteOne } = useNotifications();
+  const { notifications, count: notificationCount, markRead, deleteOne, refresh } = useNotifications();
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const [dark, setDark] = useDarkMode();
@@ -66,19 +102,38 @@ export default function DashboardPage() {
   const [navigating, setNavigating] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name: string; dp_url?: string; roll_no?: string } | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-    // Get current user from localStorage
-    const userRaw = localStorage.getItem('user');
-    if (userRaw) {
-      try {
-        const parsed = JSON.parse(userRaw);
-        setCurrentUser(parsed);
-      } catch {
-        // ignore
+  // Fetch current user profile with dp_url from API
+  const fetchCurrentUser = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/users/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data) {
+          setCurrentUser(data.data);
+        }
+      }
+    } catch {
+      // fallback to localStorage
+      const userRaw = localStorage.getItem('user');
+      if (userRaw) {
+        try {
+          const parsed = JSON.parse(userRaw);
+          setCurrentUser(parsed);
+        } catch {
+          // ignore
+        }
       }
     }
   }, []);
+
+  useEffect(() => {
+    setMounted(true);
+    fetchCurrentUser();
+  }, [fetchCurrentUser]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -266,7 +321,7 @@ export default function DashboardPage() {
               >
                 <span className="material-symbols-outlined">notifications</span>
                 {notificationCount > 0 && (
-                  <span className="absolute top-1 right-1 min-w-4.5 h-4.5 flex items-center justify-center bg-tertiary text-on-tertiary text-[10px] font-bold rounded-full px-1">
+                  <span className="absolute -top-1 -right-1 min-w-5 h-5 flex items-center justify-center bg-red-600 text-white text-[11px] font-bold rounded-full px-1.5 shadow-lg ring-2 ring-white dark:ring-gray-900 animate-pulse z-50">
                     {notificationCount > 99 ? '99+' : notificationCount}
                   </span>
                 )}
@@ -278,7 +333,7 @@ export default function DashboardPage() {
                     <span className="font-semibold text-sm text-on-surface">Notifications</span>
                     {notificationCount > 0 && (
                       <button
-                        onClick={() => { markRead(); }}
+                        onClick={async () => { await markRead(); await refresh(); }}
                         className="text-xs text-primary hover:text-primary/80 font-medium"
                       >
                         Mark all read
@@ -292,33 +347,41 @@ export default function DashboardPage() {
                         <p className="text-sm text-on-surface-variant">No notifications</p>
                       </div>
                     ) : (
-                      notifications.map((notif) => (
-                        <div
-                          key={notif.notification_id}
-                          className={`p-3 border-b border-outline-variant/20 hover:bg-surface-container-high/50 transition-colors ${!notif.read ? 'bg-primary-container/10' : ''}`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <div className="flex-1 min-w-0">
-                            <p className="text-sm text-on-surface truncate">{notif.message}</p>
-                            <p className="text-[10px] text-on-surface-variant mt-1">
-                              {typeof notif.created_at === "string" || typeof notif.created_at === "number"
-                                ? new Date(notif.created_at).toLocaleDateString()
-                                : "Unknown date"}
-                            </p>
+                      notifications.map((notif) => {
+                        const href = resolveNotificationLink(notif);
+                        return (
+                          <div
+                            key={notif.notification_id || notif.timestamp}
+                            onClick={async () => {
+                              if (notif.notification_id) {
+                                await deleteOne(notif.notification_id);
+                              }
+                              if (href) {
+                                setShowNotifications(false);
+                                router.push(href);
+                              }
+                            }}
+                            className={`p-3 border-b border-outline-variant/20 hover:bg-surface-container-high/50 transition-colors cursor-pointer ${href ? '' : 'pointer-events-none opacity-70'}`}
+                          >
+                            <div className="flex items-start gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-on-surface truncate">{notif.message}</p>
+                                <p className="text-[10px] text-on-surface-variant mt-1">
+                                  {notif.timestamp ? new Date(notif.timestamp).toLocaleDateString() : ''}
+                                </p>
+                              </div>
+                              {notif.notification_id && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteOne(notif.notification_id!); }}
+                                  className="p-1 text-on-surface-variant hover:text-error rounded-full hover:bg-error-container/30 transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                              )}
+                            </div>
                           </div>
-                            <button
-                              onClick={() => {
-                                if (notif.notification_id) {
-                                  deleteOne(notif.notification_id);
-                                }
-                              }}
-                              className="p-1 text-on-surface-variant hover:text-error rounded-full hover:bg-error-container/30 transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-sm">close</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                   <div className="p-2 border-t border-outline-variant/30 bg-surface-container-high/30">
@@ -475,18 +538,21 @@ export default function DashboardPage() {
                   </div>
                   {/* Info */}
                   <div className="p-2.5 flex flex-col gap-1.5">
-                    <div>
-                      <h3 className="text-xs font-bold text-on-surface truncate">{user.name}</h3>
-                      <p className="text-[9px] font-bold text-secondary tracking-wider uppercase">#{user.roll_no}</p>
-                    </div>
-                    {/* 3 Action Buttons in a row */}
-                    <div className="flex gap-1 mt-auto">
+                    {/* Row 1: Name/Roll + View button */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xs font-bold text-on-surface truncate">{user.name}</h3>
+                        <p className="text-[9px] font-bold text-secondary tracking-wider uppercase">#{user.roll_no}</p>
+                      </div>
                       <Link
                         href={`/profile/${user.roll_no}`}
-                        className="flex-1 py-1 rounded-md text-[9px] font-semibold text-center bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+                        className="px-2 py-1 rounded-md text-[9px] font-semibold bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors shrink-0"
                       >
                         View
                       </Link>
+                    </div>
+                    {/* Row 2: Chat and Anon buttons */}
+                    <div className="flex gap-1.5">
                       <button
                         onClick={() => handleStartChat(user.user_id, false)}
                         disabled={navigating}
@@ -589,39 +655,47 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* Floating Bottom Dock Navigation */}
-      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 flex justify-around items-center p-2 z-50 bg-white/70 dark:bg-surface-container-high/70 rounded-full backdrop-blur-lg border border-white/20 shadow-[0_20px_40px_rgba(0,32,32,0.1)] min-w-[320px]">
+      {/* Floating Bottom Dock Navigation - Icons Only */}
+      <nav className="fixed bottom-2 left-1/2 -translate-x-1/2 flex justify-center items-center gap-1 p-1.5 z-50 bg-surface-container-high/90 dark:bg-surface-container/90 rounded-full backdrop-blur-md border border-outline-variant/30 shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
         {/* Chats */}
         <Link
           href="/chat"
-          className="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:scale-110 hover:text-primary transition-all duration-300"
+          className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300"
+          title="Chats"
         >
-          <span className="material-symbols-outlined mb-1">chat_bubble</span>
-          <span className="font-bold text-[10px] uppercase tracking-widest">Chats</span>
+          <span className="material-symbols-outlined text-xl">chat_bubble</span>
         </Link>
         {/* Groups */}
         <Link
           href="/my-groups"
-          className="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:scale-110 hover:text-primary transition-all duration-300"
+          className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300"
+          title="Groups"
         >
-          <span className="material-symbols-outlined mb-1">group</span>
-          <span className="font-bold text-[10px] uppercase tracking-widest">Groups</span>
+          <span className="material-symbols-outlined text-xl">group</span>
         </Link>
-        {/* Home/IDs - Active */}
+        {/* Home - Middle */}
         <Link
           href="/dashboard"
-          className="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-6 py-2 transition-all duration-300"
+          className="w-12 h-12 flex items-center justify-center bg-primary-container text-on-primary-container rounded-full transition-all duration-300"
+          title="Home"
         >
-          <span className="material-symbols-outlined mb-1" style={{ fontVariationSettings: "'FILL' 1" }}>badge</span>
-          <span className="font-bold text-[10px] uppercase tracking-widest">IDs</span>
+          <span className="material-symbols-outlined text-xl">home</span>
+        </Link>
+        {/* IDs - my ids */}
+        <Link
+          href="/my-identities"
+          className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300"
+          title="IDs"
+        >
+          <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>badge</span>
         </Link>
         {/* Settings */}
         <Link
           href="/profile/edit"
-          className="flex flex-col items-center justify-center text-on-surface-variant px-6 py-2 hover:scale-110 hover:text-primary transition-all duration-300"
+          className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300"
+          title="Settings"
         >
-          <span className="material-symbols-outlined mb-1">settings</span>
-          <span className="font-bold text-[10px] uppercase tracking-widest">Settings</span>
+          <span className="material-symbols-outlined text-xl">settings</span>
         </Link>
       </nav>
 
@@ -644,19 +718,47 @@ function CreateGroupModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   const [formData, setFormData] = useState({
     group_name: '',
     group_desc: '',
-    group_dp_url: '',
     is_public: true,
     max_members: 500
   });
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Image size must be less than 5MB');
+        return;
+      }
+      setSelectedImage(file);
+      setImagePreview(URL.createObjectURL(file));
+      setError('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      await groupService.createGroup(formData);
+      // Create group first without image
+      const result = await groupService.createGroup(formData);
+      const groupId = result.data?.group?.group_id;
+      
+      // Upload image if selected
+      if (groupId && selectedImage) {
+        try {
+          await uploadGroupPicture(groupId, selectedImage);
+        } catch (uploadError) {
+          console.error('Failed to upload group image:', uploadError);
+          // Don't fail group creation if image upload fails
+        }
+      }
+      
       onSuccess();
     } catch (error: unknown) {
       console.error('Failed to create group', error);
@@ -690,8 +792,53 @@ function CreateGroupModal({ onClose, onSuccess }: { onClose: () => void; onSucce
             <textarea value={formData.group_desc} onChange={(e) => setFormData({ ...formData, group_desc: e.target.value })} className="input-romance resize-none" placeholder="What's this group about?" rows={3} />
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--heading)' }}>Cover Image URL</label>
-            <input type="url" value={formData.group_dp_url} onChange={(e) => setFormData({ ...formData, group_dp_url: e.target.value })} className="input-romance" placeholder="https://…" />
+            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--heading)' }}>Cover Image</label>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <div className="flex items-center gap-3">
+              {imagePreview ? (
+                <div className="relative">
+                  <Image
+                    src={imagePreview}
+                    alt="Group preview"
+                    width={80}
+                    height={80}
+                    className="w-20 h-20 rounded-xl object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedImage(null);
+                      setImagePreview(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-20 h-20 rounded-xl border-2 border-dashed border-outline-variant flex flex-col items-center justify-center gap-1 hover:bg-surface-container-high transition-colors"
+                >
+                  <span className="material-symbols-outlined text-2xl text-on-surface-variant">add_photo_alternate</span>
+                  <span className="text-xs text-on-surface-variant">Add Image</span>
+                </button>
+              )}
+              <div className="flex-1">
+                <p className="text-xs text-on-surface-variant">
+                  {selectedImage ? selectedImage.name : 'Select an image for your group'}
+                </p>
+                <p className="text-[10px] text-muted mt-1">Max size: 5MB</p>
+              </div>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

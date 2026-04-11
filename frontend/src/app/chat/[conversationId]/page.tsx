@@ -10,33 +10,33 @@ import { useToast } from '@/contexts/ToastContext';
 import type { Message, User } from '@/types/chat.types';
 import { Theme } from 'emoji-picker-react';
 import Image from 'next/image';
+import axios from 'axios';
 import MessageBubble from '@/components/MessageBubble';
 import { messageManagementService } from '@/services/message-management.service';
 import { usePresence } from '@/hooks/usePresence';
-import {
-  encryptMessageAES,
-  decryptMessageAES,
-  generateAESKey,
-  encryptKeyWithPublicKey,
-  decryptKeyWithPrivateKey,
-  // importPublicKey,
-  importPrivateKey,
-  exportKeyToBase64,
-  importKeyFromBase64
-} from '@/utils/e2ee.utils';
+import { encryptMessageAES, decryptMessageAES, generateAESKey, encryptKeyWithPublicKey,
+  decryptKeyWithPrivateKey, importPrivateKey, exportKeyToBase64, importKeyFromBase64 } from '@/utils/e2ee.utils';
 
 // Dynamic import for emoji picker (client-side only)
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 type EmojiData = { emoji: string };
+type Participant = {user_id: string; public_key: string;};
 
 export default function ChatWindowPage() {
   const router = useRouter();
   const params = useParams();
   const { getSocket, isConnected, joinConversation, leaveConversation, sendTyping } = useSocket();
   const conversationId = params.conversationId as string;
+  
+  useEffect(() => {
+    if (conversationId) {
+      router.replace(`/chat?conversationId=${conversationId}`);
+    }
+  }, [conversationId, router]);
+
+
   const toast = useToast();
   const socket = getSocket();
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Message[]>([]);
@@ -198,14 +198,16 @@ export default function ChatWindowPage() {
       const aesKeyB64 = await exportKeyToBase64(newAesKey);
 
       // Encrypt for all participants
-      const encryptedKeys = await Promise.all(participants.map(async (p: any) => {
-        const encrypted = await encryptKeyWithPublicKey(aesKeyB64, p.public_key);
-        return {
-          userId: p.user_id,
-          encryptedKey: encrypted,
-          keyVersion: 1
-        };
-      }));
+      const encryptedKeys = await Promise.all(
+        participants.map(async (p: Participant) => {
+          const encrypted = await encryptKeyWithPublicKey(aesKeyB64, p.public_key);
+          return {
+            userId: p.user_id,
+            encryptedKey: encrypted,
+            keyVersion: 1,
+          };
+        })
+      );
 
       // Store on server
       const { keyId: newKeyId } = await chatService.storeSessionKeys({
@@ -349,16 +351,21 @@ export default function ChatWindowPage() {
         setIsBlocked(response.conversation.is_blocked || false);
       }
     }
-    catch (error: any) {
-      if (error.response?.status !== 429) {
-        console.error('[ERROR] Failed to fetch messages:', error);
-        if (error.response?.status === 403) {
-          toast.error('You do not have access to this conversation.');
-          router.push('/chat');
-        } else if (error.response?.status === 404) {
-          toast.error('Conversation not found.');
-          router.push('/chat');
+    catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status !== 429) {
+          console.error('[ERROR] Failed to fetch messages:', error);
+
+          if (error.response?.status === 403) {
+            toast.error('You do not have access to this conversation.');
+            router.push('/chat');
+          } else if (error.response?.status === 404) {
+            toast.error('Conversation not found.');
+            router.push('/chat');
+          }
         }
+      } else {
+        console.error('[ERROR] Failed to fetch messages:', error);
       }
     }
     finally {
@@ -1329,6 +1336,12 @@ export default function ChatWindowPage() {
               <div className="mb-3 relative inline-block">
                 <Image src={imagePreview} alt="Preview" width={120} height={80} className="max-h-20 rounded-xl border" style={{ borderColor: 'var(--border-light)' }} />
                 <button onClick={handleRemoveImage} className="absolute -top-2 -right-2 w-6 h-6 rounded-full text-white flex items-center justify-center text-xs" style={{ background: '#EF4444' }}>✕</button>
+                {uploadingImage && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl z-10">
+                    <svg className="animate-spin h-7 w-7 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+                    <span className="ml-3 text-white font-semibold">Uploading image…</span>
+                  </div>
+                )}
               </div>
             )}
             {showEmojiPicker && (

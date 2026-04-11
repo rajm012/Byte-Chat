@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 type TabType = 'all' | 'chat' | 'group';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useToast } from '@/contexts/ToastContext';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { getMyAnonymousIdentities, revealAnonymousIdentity, AnonymousIdentity } from '@/services/anonymous.service';
 import Image from 'next/image';
 
@@ -13,15 +15,60 @@ export default function MyAnonymousIdentities() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const toast = useToast();
+  const { notifications, count: notificationCount, markRead, deleteOne } = useNotifications();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const [currentUser, setCurrentUser] = useState<{ name: string; dp_url?: string; roll_no?: string } | null>(null);
 
   const [identities, setIdentities] = useState<AnonymousIdentity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<TabType>('all');
   const [revealingId, setRevealingId] = useState<string | null>(null);
   const [confirmRevealId, setConfirmRevealId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null); // Added error state
+  const [error, setError] = useState<string | null>(null);
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showNotifications]);
+
+  // Fetch current user profile
+  const fetchCurrentUser = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/users/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data) {
+          setCurrentUser(data.data);
+        }
+      }
+    } catch {
+      const userRaw = localStorage.getItem('user');
+      if (userRaw) {
+        try {
+          const parsed = JSON.parse(userRaw);
+          setCurrentUser(parsed);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchIdentities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -39,10 +86,6 @@ export default function MyAnonymousIdentities() {
         toast.error(response.message || 'Failed to fetch identities');
       }
     } 
-    // catch (err: any) {
-    //   setError(err.message || 'Failed to load anonymous identities');
-    //   toast.error(err.message || 'Failed to load anonymous identities');
-    // } 
     catch (err: unknown) {
       let errorMsg = 'Failed to load anonymous identities';
       if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as { message?: string }).message === 'string') {
@@ -98,22 +141,25 @@ export default function MyAnonymousIdentities() {
   };
 
   const handleNavigateToChat = (identity: AnonymousIdentity) => {
-    // Cancel any pending confirmation when navigating
     if (confirmRevealId) {
       setConfirmRevealId(null);
     }
     
     if (identity.conversation_id) {
-      // Direct navigation to existing conversation
       toast.info('Opening 1V1 chat...');
-      router.push(`/chat/${identity.conversation_id}`);
+      router.push(`/chat?conversationId=${identity.conversation_id}`);
     } else if (identity.group_id) {
-      // Navigate to group chat
       toast.info('Opening group chat...');
       router.push(`/groups/${identity.group_id}/chat`);
     } else {
       toast.warning('Unable to navigate to chat');
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('theme');
+    router.push('/login');
   };
 
   const filteredIdentities = filter === 'all'
@@ -138,82 +184,185 @@ export default function MyAnonymousIdentities() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-linear-to-br from-indigo-400/10 to-transparent rounded-full blur-3xl" />
       </div>
 
-      {/* Nav */}
-      <header className="glass-nav sticky top-0 z-50 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      {/* Top Navigation Bar - Dashboard Style */}
+      <header className="glass-nav fixed top-0 w-full z-50 shadow-[0_20px_40px_rgba(0,32,32,0.06)]">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+          {/* Logo + Page Title */}
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-primary">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <span className="text-xl font-black text-on-surface tracking-tight">
+                Byte<span className="text-primary">chat</span>
+              </span>
+            </Link>
+            {/* <div className="h-6 w-px bg-outline-variant/30" />
+            <h1 className="text-lg font-bold text-on-surface">My Identities</h1> */}
+          </div>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-2">
+            {/* Notification Icon with Dropdown */}
+            <div ref={notifRef} className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2 text-on-surface hover:bg-surface-container-high transition-all duration-300 rounded-full relative"
+                aria-label="Notifications"
+              >
+                <span className="material-symbols-outlined">notifications</span>
+                {notificationCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-4.5 h-4.5 flex items-center justify-center bg-tertiary text-on-tertiary text-[10px] font-bold rounded-full px-1">
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </span>
+                )}
+              </button>
+              {/* Notification Dropdown */}
+              {showNotifications && (
+                <div className="absolute top-full right-0 mt-2 w-80 bg-surface-container-lowest rounded-xl shadow-[0_20px_40px_rgba(0,32,32,0.15)] border border-outline-variant/30 overflow-hidden z-50">
+                  <div className="p-3 border-b border-outline-variant/30 flex items-center justify-between">
+                    <span className="font-semibold text-sm text-on-surface">Notifications</span>
+                    {notificationCount > 0 && (
+                      <button
+                        onClick={() => { markRead(); }}
+                        className="text-xs text-primary hover:text-primary/80 font-medium"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-2">notifications_off</span>
+                        <p className="text-sm text-on-surface-variant">No notifications</p>
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.notification_id || notif.timestamp}
+                          className="p-3 border-b border-outline-variant/20 hover:bg-surface-container-high/50 transition-colors"
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-on-surface truncate">{notif.message}</p>
+                              <p className="text-[10px] text-on-surface-variant mt-1">
+                                {notif.timestamp ? new Date(notif.timestamp).toLocaleDateString() : ''}
+                              </p>
+                            </div>
+                            {notif.notification_id && (
+                              <button
+                                onClick={() => deleteOne(notif.notification_id!)}
+                                className="p-1 text-on-surface-variant hover:text-error rounded-full hover:bg-error-container/30 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-sm">close</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="p-2 border-t border-outline-variant/30 bg-surface-container-high/30">
+                    <button
+                      onClick={() => { setShowNotifications(false); router.push('/chat'); }}
+                      className="w-full py-2 text-xs font-semibold text-primary hover:bg-primary-container/30 rounded-lg transition-colors"
+                    >
+                      View all chats
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Dark Mode */}
             <button
-              onClick={() => router.push('/dashboard')}
-              className="btn-ghost px-3 py-2 text-sm flex items-center gap-2"
+              onClick={toggleTheme}
+              className="p-2 text-on-surface hover:bg-surface-container-high transition-all duration-300 rounded-full"
+              aria-label="Toggle theme"
             >
-              <span>←</span> Back
+              <span className="material-symbols-outlined">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
             </button>
-            <div>
-              <h1 className="text-xl font-bold heading-romance">My Identities</h1>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>Your anonymous personas</p>
+            <div className="h-8 w-px bg-outline-variant/30 mx-1" />
+            {/* Profile + Logout */}
+            <div className="flex items-center gap-2">
+              <Link
+                href="/profile/edit"
+                className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-container shadow-sm hover:scale-105 transition-transform"
+              >
+                {currentUser?.dp_url ? (
+                  <Image
+                    src={currentUser.dp_url}
+                    alt={currentUser.name || 'Profile'}
+                    width={40}
+                    height={40}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-linear-to-br from-primary to-tertiary flex items-center justify-center">
+                    <span className="material-symbols-outlined text-white text-lg">person</span>
+                  </div>
+                )}
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="p-2 text-on-surface hover:bg-surface-container-high transition-all duration-300 rounded-full scale-95 active:scale-90"
+              >
+                <span className="material-symbols-outlined">logout</span>
+              </button>
             </div>
           </div>
-          <button
-            onClick={toggleTheme}
-            className="btn-ghost w-10 h-10 rounded-full flex items-center justify-center text-lg"
-            aria-label="Toggle theme"
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-5 sm:px-8 pt-24 pb-12">
 
-        {/* Hero strip */}
-        <div className="glass-strong rounded-3xl p-6 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shrink-0"
-              style={{ background: 'var(--grad-mystery)' }}>
-              🎭
-            </div>
+        {/* Header Section */}
+        <header className="mb-10">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <h2 className="text-2xl font-bold" style={{ color: 'var(--heading)' }}>
-                Anonymous Identities
-              </h2>
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>
+              <span className="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Anonymous Personas</span>
+              <h1 className="text-4xl sm:text-5xl font-extrabold text-on-surface tracking-tight leading-none">
+                My <span className="text-primary italic">Identities.</span>
+              </h1>
+              <p className="text-sm text-on-surface-variant mt-2">
                 {identities.length} active persona{identities.length !== 1 ? 's' : ''} · Click any card to open the chat
               </p>
             </div>
+            {/* Stats */}
+            <div className="flex gap-3">
+              {[
+                { label: 'Total', value: identities.length, color: 'var(--purple)' },
+                { label: '1V1', value: chatCount, color: 'var(--pink)' },
+                { label: 'Groups', value: groupCount, color: '#22c55e' },
+              ].map(s => (
+                <div key={s.label} className="glass rounded-2xl px-5 py-3 text-center min-w-18">
+                  <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
+                  <p className="text-xs text-on-surface-variant">{s.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          {/* Stats */}
-          <div className="flex gap-3">
-            {[
-              { label: 'Total', value: identities.length, color: 'var(--purple)' },
-              { label: '1V1', value: chatCount, color: 'var(--pink)' },
-              { label: 'Groups', value: groupCount, color: '#22c55e' },
-            ].map(s => (
-              <div key={s.label} className="glass rounded-2xl px-4 py-3 text-center min-w-15">
-                <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
-                <p className="text-xs" style={{ color: 'var(--muted)' }}>{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        </header>
 
         {/* Filter Tabs */}
-        <div className="glass rounded-2xl p-1.5 flex gap-1 mb-8 w-fit animate-fade-in">
+        <div className="flex gap-2 mb-8">
           {(['all', 'chat', 'group'] as TabType[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setFilter(tab)}
-              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2 ${
+              className={`px-5 py-2 rounded-full font-semibold text-sm transition-all ${
                 filter === tab
-                  ? 'text-white shadow-lg'
-                  : 'hover:bg-white/10'
+                  ? 'bg-tertiary-container text-on-tertiary-container hover:scale-105'
+                  : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
               }`}
-              style={filter === tab ? { background: 'var(--grad-mystery)' } : { color: 'var(--muted)' }}
             >
               {tabLabels[tab]}
-              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                filter === tab ? 'bg-white/20 text-white' : 'bg-white/10'
+              <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs font-bold ${
+                filter === tab ? 'bg-on-tertiary-container/15' : 'bg-outline-variant/20'
               }`}
-                style={filter !== tab ? { color: 'var(--muted)' } : {}}>
+              >
                 {tabCounts[tab]}
               </span>
             </button>
@@ -222,8 +371,9 @@ export default function MyAnonymousIdentities() {
 
         {/* Error */}
         {error && (
-          <div className="glass rounded-2xl p-4 mb-6 border border-red-400/30 bg-red-500/10 text-red-400 animate-fade-in">
-            ⚠️ {error}
+          <div className="rounded-2xl p-4 mb-6 border border-error/30 bg-error-container/10 text-error animate-fade-in flex items-center gap-2">
+            <span className="material-symbols-outlined">warning</span>
+            {error}
           </div>
         )}
 
@@ -256,16 +406,16 @@ export default function MyAnonymousIdentities() {
         {/* Empty State */}
         {!isLoading && filteredIdentities.length === 0 && (
           <div className="glass-strong rounded-3xl p-16 text-center animate-scale-in">
-            <div className="text-6xl mb-4">🎭</div>
-            <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--heading)' }}>
+            <span className="material-symbols-outlined text-6xl text-on-surface-variant mb-4 block">theater_comedy</span>
+            <h3 className="text-xl font-bold text-on-surface mb-2">
               No anonymous identities yet
             </h3>
-            <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
+            <p className="text-sm text-on-surface-variant mb-6">
               Send an anonymous message or join a group anonymously to create one
             </p>
             <button
               onClick={() => router.push('/dashboard')}
-              className="btn-purple"
+              className="px-6 py-2.5 rounded-full bg-primary text-on-primary font-semibold hover:scale-105 transition-all"
             >
               Explore Students & Groups
             </button>
@@ -280,7 +430,7 @@ export default function MyAnonymousIdentities() {
                 key={identity.identity_id}
                 className={`glass-card rounded-3xl p-6 cursor-pointer hover:scale-[1.02] transition-all duration-200 animate-fade-in ${
                   confirmRevealId === identity.identity_id
-                    ? 'ring-2 ring-red-400/60'
+                    ? 'ring-2 ring-error/60'
                     : ''
                 }`}
                 style={{ animationDelay: `${idx * 60}ms` }}
@@ -289,12 +439,13 @@ export default function MyAnonymousIdentities() {
               >
                 {/* Card header */}
                 <div className="flex items-start justify-between mb-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
                     identity.group_id
-                      ? 'bg-emerald-500/15 text-emerald-400'
-                      : 'bg-purple-500/15 text-purple-400'
+                      ? 'bg-tertiary-container/30 text-on-tertiary-container'
+                      : 'bg-primary-container/30 text-on-primary-container'
                   }`}>
-                    {identity.group_id ? '👥 Group' : '💬 1V1 Chat'}
+                    <span className="material-symbols-outlined text-sm">{identity.group_id ? 'groups' : 'chat'}</span>
+                    {identity.group_id ? 'Group' : '1V1 Chat'}
                   </span>
                   <button
                     onClick={(e) => {
@@ -302,38 +453,51 @@ export default function MyAnonymousIdentities() {
                       handleRevealIdentity(identity.identity_id);
                     }}
                     disabled={revealingId === identity.identity_id || identity.is_revealed}
-                    className={`text-xs font-semibold px-3 py-1 rounded-full transition-all ${
+                    className={`text-xs font-semibold px-3 py-1 rounded-full transition-all flex items-center gap-1 ${
                       identity.is_revealed
-                        ? 'bg-white/5 text-gray-500 cursor-not-allowed'
+                        ? 'bg-surface-container text-on-surface-variant cursor-not-allowed'
                         : revealingId === identity.identity_id
-                        ? 'bg-white/5 text-gray-400'
+                        ? 'bg-surface-container text-on-surface-variant'
                         : confirmRevealId === identity.identity_id
-                        ? 'bg-red-500/20 text-red-400 animate-pulse'
-                        : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25'
+                        ? 'bg-error-container/30 text-error animate-pulse'
+                        :
+                          // Custom: Improve contrast for dark mode
+                          `${theme === 'dark'
+                            ? 'bg-secondary text-on-secondary hover:bg-secondary/80'
+                            : 'bg-secondary-container/30 text-on-secondary-container hover:bg-secondary-container/50'}'`
                     }`}
                   >
+                    <span className="material-symbols-outlined text-sm">
+                      {identity.is_revealed
+                        ? 'check'
+                        : revealingId === identity.identity_id
+                        ? 'progress_activity'
+                        : confirmRevealId === identity.identity_id
+                        ? 'warning'
+                        : 'lock_open'}
+                    </span>
                     {identity.is_revealed
-                      ? '✓ Revealed'
+                      ? 'Revealed'
                       : revealingId === identity.identity_id
                       ? 'Revealing…'
                       : confirmRevealId === identity.identity_id
-                      ? '⚠️ Confirm?'
-                      : '🔓 Reveal'}
+                      ? 'Confirm?'
+                      : 'Reveal'}
                   </button>
                 </div>
 
                 {/* Anon string */}
                 <div className="mb-4">
-                  <p className="font-mono text-sm font-bold mb-1 truncate" style={{ color: 'var(--purple)' }}>
+                  <p className="font-mono text-sm font-bold mb-1 truncate text-primary">
                     {identity.random_string.substring(0, 24)}…
                   </p>
-                  <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                    {identity.display_gender}
+                  <p className="text-xs text-on-surface-variant">
+                    {identity.display_gender?.toUpperCase() || 'UNKNOWN'}
                   </p>
                 </div>
 
                 {/* Target info */}
-                <div className="glass rounded-2xl p-3 mb-4">
+                <div className="rounded-2xl p-3 mb-4 bg-surface-container/50">
                   {identity.target_user_id && identity.target_user && (
                     <div className="flex items-center gap-3">
                       <Image
@@ -341,13 +505,13 @@ export default function MyAnonymousIdentities() {
                         alt={identity.target_user.name}
                         width={36}
                         height={36}
-                        className="rounded-full object-cover ring-2 ring-white/20"
+                        className="rounded-full object-cover ring-2 ring-outline-variant/30"
                       />
                       <div className="min-w-0">
-                        <p className="font-semibold text-sm truncate" style={{ color: 'var(--heading)' }}>
+                        <p className="font-semibold text-sm truncate text-on-surface">
                           {identity.target_user.name}
                         </p>
-                        <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
+                        <p className="text-xs truncate text-on-surface-variant">
                           {identity.target_user.roll_no}
                         </p>
                       </div>
@@ -355,16 +519,15 @@ export default function MyAnonymousIdentities() {
                   )}
                   {identity.group_id && identity.target_group && (
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-base shrink-0"
-                        style={{ background: 'var(--grad-ocean)' }}>
-                        👥
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-base shrink-0 bg-tertiary-container">
+                        <span className="material-symbols-outlined text-on-tertiary-container text-lg">groups</span>
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-sm truncate" style={{ color: 'var(--heading)' }}>
+                        <p className="font-semibold text-sm truncate text-on-surface">
                           {identity.target_group.group_name}
                         </p>
-                        <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                          {identity.target_group.is_public ? '🌐 Public' : '🔒 Private'}
+                        <p className="text-xs text-on-surface-variant">
+                          {identity.target_group.is_public ? 'Public' : 'Private'}
                         </p>
                       </div>
                     </div>
@@ -372,12 +535,12 @@ export default function MyAnonymousIdentities() {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
-                  <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                <div className="flex items-center justify-between pt-3 border-t border-outline-variant/20">
+                  <p className="text-xs text-on-surface-variant">
                     {new Date(identity.created_at).toLocaleDateString()}
                   </p>
-                  <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--pink)' }}>
-                    Open chat <span>→</span>
+                  <span className="text-xs font-medium flex items-center gap-1 text-primary">
+                    Open chat <span className="material-symbols-outlined text-sm">arrow_forward</span>
                   </span>
                 </div>
               </div>
@@ -385,6 +548,49 @@ export default function MyAnonymousIdentities() {
           </div>
         )}
       </main>
-    </div>
+    {/* Floating Bottom Dock Navigation - Icons Only */}
+    <nav className="fixed bottom-2 left-1/2 -translate-x-1/2 flex justify-center items-center gap-1 p-1.5 z-50 bg-surface-container-high/90 dark:bg-surface-container/90 rounded-full backdrop-blur-md border border-outline-variant/30 shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
+      {/* Chats */}
+      <Link
+        href="/chat"
+        className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300"
+        title="Chats"
+      >
+        <span className="material-symbols-outlined text-xl">chat_bubble</span>
+      </Link>
+      {/* Groups */}
+      <Link
+        href="/my-groups"
+        className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300"
+        title="Groups"
+      >
+        <span className="material-symbols-outlined text-xl">group</span>
+      </Link>
+      {/* Home - Middle (not active) */}
+      <Link
+        href="/dashboard"
+        className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300"
+        title="Home"
+      >
+        <span className="material-symbols-outlined text-xl">home</span>
+      </Link>
+      {/* IDs - my ids (active) */}
+      <Link
+        href="/my-identities"
+        className="w-12 h-12 flex items-center justify-center bg-primary-container text-on-primary-container rounded-full transition-all duration-300"
+        title="IDs"
+      >
+        <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>badge</span>
+      </Link>
+      {/* Settings */}
+      <Link
+        href="/profile/edit"
+        className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300"
+        title="Settings"
+      >
+        <span className="material-symbols-outlined text-xl">settings</span>
+      </Link>
+    </nav>
+  </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { chatService } from '@/services/chat.service';
 import anonymousChatService from '@/services/anonymous-chat.service';
 
@@ -13,7 +13,7 @@ type ChatResponse = {
 
 export default function NewChatPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [searchParamsObj, setSearchParamsObj] = useState<URLSearchParams | null>(null);
   const [status, setStatus] = useState<'sending' | 'success' | 'error'>('sending');
   const [error, setError] = useState<string>('');
   const [retrying, setRetrying] = useState(false);
@@ -45,7 +45,7 @@ export default function NewChatPage() {
       // Anonymous chat: response.conversationId (already extracted .data.data)
       const conversationId = isAnonymous ? response.conversationId : response.data?.conversationId;
       setTimeout(() => {
-        router.push(`/chat/${conversationId}`);
+        router.push(`/chat?conversationId=${conversationId}`);
       }, 500);
     } 
     catch (err: unknown) {
@@ -94,8 +94,8 @@ export default function NewChatPage() {
       return;
     }
 
-    const userId = searchParams.get('userId');
-    const isAnonymous = searchParams.get('anonymous') === 'true';
+    const userId = searchParamsObj?.get('userId');
+    const isAnonymous = searchParamsObj?.get('anonymous') === 'true';
 
     if (!userId) {
       setStatus('error');
@@ -117,11 +117,11 @@ export default function NewChatPage() {
     // Mark request as sent
     requestSentRef.current = true;
     sendRequest(userId, isAnonymous);
-  }, [sendRequest, searchParams]);
+  }, [sendRequest, searchParamsObj]);
 
   const handleRetry = () => {
-    const userId = searchParams.get('userId');
-    const isAnonymous = searchParams.get('anonymous') === 'true';
+    const userId = searchParamsObj?.get('userId');
+    const isAnonymous = searchParamsObj?.get('anonymous') === 'true';
     
     if (userId) {
       setRetrying(true);
@@ -129,6 +129,14 @@ export default function NewChatPage() {
       sendRequest(userId, isAnonymous);
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setSearchParamsObj(params);
+    const onPop = () => setSearchParamsObj(new URLSearchParams(window.location.search));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   return (
     <div className="min-h-screen bg-mesh-warm antialiased flex items-center justify-center p-4">

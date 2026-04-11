@@ -3,6 +3,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined');
 @import "tailwindcss";
 
+/* Enable dark mode with class strategy */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Fix for dark mode toggle button to ensure perfect circle and border in all themes */
 .dark-toggle-btn {
   width: 40px;
@@ -23,11 +26,6 @@
   background: var(--surface-container-highest);
 }
 
-
-
-/* =====================
-   DARK THEME COLORS
-   ===================== */
 .dark {
   --bg: #002020;
   --surface: #003535;
@@ -53,6 +51,9 @@
   --glass-border-soft: rgba(111, 120, 125, 0.3);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0,0,0,0.2);
   --glass-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0,0,0,0.3);
+
+  /* Dark mode utility colors */
+  --white-10: rgba(255, 255, 255, 0.10);
 }
 
 /* Hero image rotation only on hover */
@@ -67,10 +68,6 @@
   line-height: 1.5;
   letter-spacing: 0.01em;
 }
-
-/* ============================================================
-   BYTE-CHAT Design System v3.0 — Cozy Material Design 3
-   ============================================================ */
 
 :root {
   /* ── Cozy Primary (Sky/Teal) ──────────────────────────── */
@@ -134,6 +131,9 @@
   --glass-border-soft: rgba(191, 200, 205, 0.4);
   --glass-shadow:     0 8px 32px rgba(12, 103, 128, 0.08), 0 2px 8px rgba(0, 32, 32, 0.04);
   --glass-shadow-lg:  0 20px 60px rgba(12, 103, 128, 0.12), 0 8px 24px rgba(0, 32, 32, 0.06);
+
+  /* ── Utility Colors ─────────────────────────────────── */
+  --white-10:         rgba(255, 255, 255, 0.10);
 
   /* ── Cozy Gradients ──────────────────────────────────── */
   --grad-romance:  linear-gradient(135deg, #87CEEB 0%, #B4E1E4 50%, #E6E6FA 100%);

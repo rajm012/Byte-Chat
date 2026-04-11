@@ -8,18 +8,41 @@ import { checkIfBlocked } from '@/services/moderation.service';
 import Image from 'next/image';
 import QRCode from 'qrcode';
 
+// Explicit types for profile and API responses
+interface Profile {
+  user_id: string;
+  name: string;
+  dp_url?: string;
+  roll_no: string;
+  branch?: string;
+  bio?: string;
+  is_verified?: boolean;
+  gender?: string;
+  dob?: string;
+  instagram_url?: string;
+  twitter_url?: string;
+  linkedin_url?: string;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+  blocked?: boolean;
+  blockMessage?: string;
+}
 export default function ViewProfile() {
   const params = useParams();
   const router = useRouter();
   const rollNo = params.rollNo as string;
   // need proper error handling
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
-  const [blockMessage, setBlockMessage] = useState('');
-  const [, setBlockedByOther] = useState(false);
+  const [, setBlockMessage] = useState<string>('');
+  const [, setBlockedByOther] = useState<boolean>(false);
   const [navigating, setNavigating] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
@@ -32,7 +55,7 @@ export default function ViewProfile() {
       const myProfileResponse = await fetch(`${API_BASE_URL}/api/profile/me`, {
         credentials: 'include'
       });
-      const myProfileData = await myProfileResponse.json();
+      const myProfileData = await myProfileResponse.json() as ApiResponse<{ roll_no: string }>;
       if (myProfileData.success) {
         setIsOwnProfile(myProfileData.data.roll_no.toUpperCase() === rollNo.toUpperCase());
       }
@@ -42,7 +65,7 @@ export default function ViewProfile() {
         credentials: 'include'
       });
 
-      const data = await response.json();
+      const data = await response.json() as ApiResponse<Profile> & { blocked?: boolean; blockMessage?: string };
 
       if (response.status === 403) {
         // User is blocked by the profile owner
@@ -118,223 +141,240 @@ export default function ViewProfile() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-mesh-warm flex items-center justify-center">
-        <div className="text-center animate-fade-in">
-          <div className="w-16 h-16 rounded-full border-4 border-transparent mx-auto mb-4 animate-spin"
-            style={{ borderTopColor: 'var(--pink)', borderRightColor: 'var(--coral)' }} />
-          <p className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Loading profile…</p>
-        </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#002020]/40 backdrop-blur-md">
+        <div className="w-16 h-16 rounded-full border-4 border-[#87ceeb] border-t-transparent animate-spin" />
       </div>
     );
   }
 
   if (error || !profile) {
     return (
-      <div className="min-h-screen bg-mesh-warm flex items-center justify-center p-4">
-        <div className="glass-strong rounded-3xl p-8 text-center max-w-sm animate-scale-in">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#002020]/40 backdrop-blur-md p-4">
+        <div className="bg-white rounded-3xl p-8 text-center max-w-sm shadow-2xl">
           <div className="text-4xl mb-4">😕</div>
-          <p className="font-semibold mb-6" style={{ color: 'var(--heading)' }}>{error || 'Profile not found'}</p>
-          <button onClick={() => router.back()} className="btn-romance px-6 py-2.5">Go Back</button>
+          <p className="font-semibold mb-6 text-[#002020]">{error || 'Profile not found'}</p>
+          <button 
+            onClick={() => router.back()} 
+            className="px-6 py-2.5 bg-linear-to-r from-[#87ceeb] via-[#e6e6fa] to-[#ffb6c1] text-[#002020] rounded-xl font-semibold hover:opacity-90 transition-opacity"
+          >
+            Go Back
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-mesh-warm antialiased">
-      {/* Blobs */}
-      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-linear-to-br from-pink-300/10 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-[-10%] left-[-5%] w-80 h-80 bg-linear-to-tr from-purple-300/10 to-transparent rounded-full blur-3xl" />
-      </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 lg:p-12 bg-black/40 backdrop-blur-md dark:bg-black/60">
+      {/* Modal Container */}
+      <div className="relative w-full max-w-5xl h-[75vh] md:h-160 bg-surface-container-lowest dark:bg-surface-container rounded-3xl shadow-[0_40px_80px_rgba(0,32,32,0.2)] dark:shadow-[0_40px_80px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden">
+        {/* Close Button */}
+        <button 
+          onClick={() => router.back()}
+          className="absolute top-6 right-6 z-20 w-12 h-12 flex items-center justify-center rounded-full bg-white text-[#002020] hover:bg-gray-100 transition-all duration-300 shadow-lg active:scale-90 dark:bg-[#004a4a] dark:text-white dark:hover:bg-[#005555]"
+        >
+          <span className="material-symbols-outlined text-3xl">close</span>
+        </button>
 
-      {/* Nav bar */}
-      <header className="glass-nav sticky top-0 z-20 px-4 py-3 flex items-center justify-between">
-        <button onClick={() => router.back()} className="btn-ghost w-9 h-9 rounded-full flex items-center justify-center text-lg">←</button>
-        <p className="font-semibold text-sm" style={{ color: 'var(--heading)' }}>Profile</p>
-        <div className="w-9" /> {/* spacer */}
-      </header>
-
-      <main className="max-w-lg mx-auto px-4 py-6">
-        {/* Cover + avatar */}
-        <div className="glass-strong rounded-3xl overflow-hidden mb-4 animate-fade-in">
-          {/* Cover */}
-          <div className="h-28 w-full" style={{ background: 'var(--grad-romance)' }} />
-          {/* Profile content */}
-          <div className="px-6 pb-6">
-            {/* Avatar */}
-            <div className="-mt-12 mb-4">
-              {profile.dp_url ? (
-                <Image src={profile.dp_url} alt={profile.name} width={96} height={96}
-                  className="w-24 h-24 rounded-2xl object-cover border-4 shadow-xl"
-                  style={{ borderColor: 'var(--glass-bg)' }}
-                  priority={true} />
-              ) : (
-                <div className="w-24 h-24 rounded-2xl flex items-center justify-center text-white text-3xl font-bold border-4 shadow-xl"
-                  style={{ background: 'var(--grad-romance)', borderColor: 'var(--glass-bg)' }}>
-                  {profile.name?.charAt(0).toUpperCase() || '?'}
-                </div>
-              )}
+        {/* Content Canvas */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          {/* Left Column: Visual Profile */}
+          <div className="w-full md:w-5/12 relative h-64 md:h-full bg-surface-container-low overflow-hidden">
+            {profile.dp_url ? (
+              <Image 
+                src={profile.dp_url} 
+                alt={profile.name}
+                fill
+                className="object-cover"
+                priority
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-primary to-secondary-container">
+                <span className="text-6xl font-bold text-white">{profile.name?.charAt(0).toUpperCase() || '?'}</span>
+              </div>
+            )}
+            {/* Gradient overlay at bottom */}
+            <div className="absolute bottom-0 left-0 right-0 p-8 bg-linear-to-t from-black/80 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-emerald-400 rounded-full border-2 border-white shadow-lg" />
+                <span className="text-white font-medium text-xs uppercase tracking-widest">{profile.is_verified ? 'Verified' : 'Member'}</span>
+              </div>
+              <h2 className="text-white text-3xl md:text-4xl font-bold mt-2 tracking-tight">{profile.name}</h2>
+              <p className="text-white/80 text-lg">{profile.roll_no}</p>
             </div>
+          </div>
 
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div>
-                <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--heading)' }}>{profile.name}</h1>
-                <p className="text-sm mb-3" style={{ color: 'var(--muted)' }}>{profile.roll_no}</p>
-                <div className="flex flex-wrap gap-2">
-                  {profile.branch && (
-                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/15 text-purple-400">{profile.branch}</span>
-                  )}
-                  {profile.gender && (
-                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold" style={{ background: 'var(--grad-romance)', color: '#fff' }}>{profile.gender}</span>
-                  )}
-                  {profile.is_verified && (
-                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400">✓ Verified</span>
-                  )}
+          {/* Right Column: Info & Actions */}
+          <div className="w-full md:w-7/12 p-6 md:p-10 lg:p-12 flex flex-col overflow-y-auto">
+            <div className="space-y-8">
+              {/* Metadata Bento */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-surface-container p-5 rounded-2xl dark:bg-surface-container-high">
+                  <span className="text-on-surface-variant font-medium text-[10px] uppercase tracking-[0.2em]">Roll Number</span>
+                  <p className="text-on-surface font-bold text-xl mt-1">{profile.roll_no}</p>
+                </div>
+                <div className="bg-surface-container p-5 rounded-2xl dark:bg-surface-container-high">
+                  <span className="text-on-surface-variant font-medium text-[10px] uppercase tracking-[0.2em]">Branch</span>
+                  <p className="text-on-surface font-bold text-xl mt-1">{profile.branch?.toUpperCase() || 'N/A'}</p>
                 </div>
               </div>
 
-              {/* Action buttons */}
-              <div className="flex flex-col gap-2 mt-1">
-                {isOwnProfile ? (
-                  <>
-                    <Link href="/profile/edit">
-                      <button className="btn-romance px-4 py-2 text-sm">✏️ Edit Profile</button>
-                    </Link>
-                    <button
-                      onClick={handleShareProfile}
-                      className="btn-ghost px-4 py-2 text-sm flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                      </svg>
-                      Share QR
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {blockMessage && (
-                      <div className="glass rounded-xl px-3 py-2 text-xs text-yellow-400 text-center">🚫 {blockMessage}</div>
-                    )}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleStartChat(profile.user_id, false)}
-                        disabled={isBlocked || navigating}
-                        className="btn-romance px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                        💬 Message
-                      </button>
-                      <button
-                        onClick={() => handleStartChat(profile.user_id, true)}
-                        disabled={isBlocked || navigating}
-                        className="btn-purple px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                        🎭 Anon
-                      </button>
-                    </div>
-                    <button
-                      onClick={handleShareProfile}
-                      className="btn-ghost px-4 py-2 text-sm flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                      </svg>
-                      Share QR
-                    </button>
-                    <div>
-                      <BlockUserButton userId={profile.user_id} userName={profile.name}
-                        isBlocked={isBlocked} onBlockStatusChange={handleBlockStatusChange} />
-                    </div>
-                  </>
+              {/* Bio Section */}
+              {profile.bio && (
+                <div className="space-y-3">
+                  <h3 className="text-on-surface-variant font-medium text-[10px] uppercase tracking-[0.2em] flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                    About
+                  </h3>
+                  <p className="text-on-surface text-lg leading-relaxed">{profile.bio}</p>
+                </div>
+              )}
+
+              {/* Interests / Tags */}
+              <div className="flex flex-wrap gap-3">
+                {profile.gender && (
+                  <span className="px-4 py-2 rounded-full bg-secondary-container text-on-secondary-container font-medium text-sm uppercase">
+                    {profile.gender}
+                  </span>
+                )}
+                {profile.is_verified && (
+                  <span className="px-4 py-2 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-medium text-sm flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">verified</span>
+                    Verified
+                  </span>
+                )}
+                {profile.dob && (
+                  <span className="px-4 py-2 rounded-full bg-[#f9b1bc] text-[#331019] font-medium text-sm dark:bg-[#7f4e52] dark:text-white">
+                    🎂 {new Date(profile.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
                 )}
               </div>
+
+              {/* Social Links */}
+              {(profile.instagram_url || profile.twitter_url || profile.linkedin_url) && (
+                <div className="space-y-3">
+                  <h3 className="text-on-surface-variant font-medium text-[10px] uppercase tracking-[0.2em]">Social Links</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {profile.instagram_url && (
+                      <a href={profile.instagram_url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface dark:bg-surface-container-high dark:hover:bg-surface-container-highest">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069z"/></svg>
+                        <span className="text-sm font-medium">Instagram</span>
+                      </a>
+                    )}
+                    {profile.twitter_url && (
+                      <a href={profile.twitter_url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface dark:bg-surface-container-high dark:hover:bg-surface-container-highest">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                        <span className="text-sm font-medium">Twitter</span>
+                      </a>
+                    )}
+                    {profile.linkedin_url && (
+                      <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface dark:bg-surface-container-high dark:hover:bg-surface-container-highest">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065z"/></svg>
+                        <span className="text-sm font-medium">LinkedIn</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-auto pt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {isOwnProfile ? (
+                <>
+                  <Link href="/profile/edit" className="sm:col-span-2">
+                    <button className="w-full bg-linear-to-r from-primary via-secondary-container to-tertiary-container h-14 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95 text-on-primary font-bold text-lg">
+                      <span className="material-symbols-outlined">edit</span>
+                      Edit Profile
+                    </button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleStartChat(profile.user_id, false)}
+                    disabled={isBlocked || navigating}
+                    className="bg-[#0c6780] h-14 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-lg dark:bg-[#87ceeb] dark:text-[#002020]"
+                  >
+                    <span className="material-symbols-outlined">chat_bubble</span>
+                    Chat
+                  </button>
+                  <button
+                    onClick={() => handleStartChat(profile.user_id, true)}
+                    disabled={isBlocked || navigating}
+                    className="bg-surface-container h-14 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:bg-surface-container-high hover:shadow-lg hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-on-surface font-bold text-lg border-2 border-outline-variant/30 dark:bg-surface-container-high dark:hover:bg-surface-container-highest"
+                  >
+                    <span className="material-symbols-outlined">visibility_off</span>
+                    Anonymous
+                  </button>
+                  <button
+                    onClick={handleShareProfile}
+                    className="bg-secondary-container h-12 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 hover:bg-secondary-fixed-dim hover:shadow-md active:scale-95 text-on-secondary-container font-semibold"
+                  >
+                    <span className="material-symbols-outlined">qr_code</span>
+                    Share QR
+                  </button>
+                  <div className="flex items-center justify-center">
+                    <BlockUserButton 
+                      userId={profile.user_id} 
+                      userName={profile.name}
+                      isBlocked={isBlocked} 
+                      onBlockStatusChange={handleBlockStatusChange} 
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Bio */}
-        {profile.bio && (
-          <div className="glass-card rounded-3xl p-5 mb-4 animate-fade-in">
-            <h2 className="text-sm font-bold mb-2" style={{ color: 'var(--muted)' }}>ABOUT</h2>
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--body)' }}>{profile.bio}</p>
-          </div>
-        )}
-
-        {/* Social Media Links */}
-        {(profile.instagram_url || profile.twitter_url || profile.linkedin_url) && (
-          <div className="glass-card rounded-3xl p-5 mb-4 animate-fade-in">
-            <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--muted)' }}>SOCIAL LINKS</h2>
-            <div className="flex flex-wrap gap-3">
-              {profile.instagram_url && (
-                <a
-                  href={profile.instagram_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl glass hover:scale-105 transition-all"
-                  style={{ color: 'var(--body)' }}
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-                  </svg>
-                  <span className="text-sm font-medium">Instagram</span>
-                </a>
-              )}
-              {profile.twitter_url && (
-                <a
-                  href={profile.twitter_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl glass hover:scale-105 transition-all"
-                  style={{ color: 'var(--body)' }}
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                  <span className="text-sm font-medium">Twitter</span>
-                </a>
-              )}
-              {profile.linkedin_url && (
-                <a
-                  href={profile.linkedin_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl glass hover:scale-105 transition-all"
-                  style={{ color: 'var(--body)' }}
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                  </svg>
-                  <span className="text-sm font-medium">LinkedIn</span>
-                </a>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Details grid */}
-        <div className="grid grid-cols-2 gap-3 animate-fade-in">
-          {profile.dob && (
-            <div className="glass-card rounded-2xl p-4">
-              <p className="text-xs mb-1 font-medium" style={{ color: 'var(--muted)' }}>Birthday</p>
-              <p className="text-sm font-semibold" style={{ color: 'var(--heading)' }}>
-                {new Date(profile.dob).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-              </p>
-            </div>
-          )}
-          <div className="glass-card rounded-2xl p-4">
-            <p className="text-xs mb-1 font-medium" style={{ color: 'var(--muted)' }}>Member Since</p>
-            <p className="text-sm font-semibold" style={{ color: 'var(--heading)' }}>
-              {new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-            </p>
-          </div>
-          {profile.last_login && (
-            <div className="glass-card rounded-2xl p-4">
-              <p className="text-xs mb-1 font-medium" style={{ color: 'var(--muted)' }}>Last Active</p>
-              <p className="text-sm font-semibold" style={{ color: 'var(--heading)' }}>
-                {new Date(profile.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </p>
-            </div>
-          )}
-        </div>
-      </main>
+      {/* Floating Bottom Dock Navigation - Icons Only */}
+      <nav className="fixed bottom-2 left-1/2 -translate-x-1/2 flex justify-center items-center gap-1 p-1.5 z-50 rounded-full backdrop-blur-md border shadow-[0_8px_24px_rgba(0,0,0,0.12)] bg-white/90 border-[#d2f5f4] dark:bg-[#003535]/90 dark:border-[#004a4a] dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
+        {/* Chats */}
+        <Link
+          href="/chat"
+          className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]"
+          title="Chats"
+        >
+          <span className="material-symbols-outlined text-xl">chat_bubble</span>
+        </Link>
+        {/* Groups */}
+        <Link
+          href="/my-groups"
+          className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]"
+          title="Groups"
+        >
+          <span className="material-symbols-outlined text-xl">group</span>
+        </Link>
+        {/* Home */}
+        <Link
+          href="/dashboard"
+          className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]"
+          title="Home"
+        >
+          <span className="material-symbols-outlined text-xl">home</span>
+        </Link>
+        {/* IDs */}
+        <Link
+          href="/my-identities"
+          className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]"
+          title="IDs"
+        >
+          <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>badge</span>
+        </Link>
+        {/* Settings */}
+        <Link
+          href="/profile/edit"
+          className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]"
+          title="Settings"
+        >
+          <span className="material-symbols-outlined text-xl">settings</span>
+        </Link>
+      </nav>
 
       {/* QR Code Modal */}
       {showQRModal && (

@@ -56,7 +56,7 @@ export default function GroupImageManager({
     setMessage(null);
 
     try {
-      const result = await uploadGroupPicture(groupId, file, '');
+      const result = await uploadGroupPicture(groupId, file);
       const group = result.data?.group;
       
       if (result.success && group) {
@@ -103,7 +103,7 @@ export default function GroupImageManager({
     setMessage(null);
 
     try {
-      const result = await deleteGroupPicture(groupId, '');
+      const result = await deleteGroupPicture(groupId);
       
       if (result.success) {
         setMessage({ type: 'success', text: 'Group picture deleted successfully!' });
@@ -145,7 +145,7 @@ export default function GroupImageManager({
     setMessage(null);
 
     try {
-      const result = await selectGroupPresetAvatar(groupId, avatarId, '');
+      const result = await selectGroupPresetAvatar(groupId, avatarId);
       const group = result.data?.group;
       
       if (result.success && group) {

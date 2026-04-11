@@ -464,7 +464,7 @@ export const uploadGroupPicture = async (req: Request, res: Response) => {
     const uploadResult = await uploadToCloudinary(
       req.file.buffer,
       'group_pictures',
-      `group_${groupId}_${Date.now()} `
+      `group_${groupId}_${Date.now()}`
     );
 
     // Update database with new image URL

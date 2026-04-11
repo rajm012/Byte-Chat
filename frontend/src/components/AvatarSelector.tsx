@@ -7,20 +7,27 @@ import Image from 'next/image';
 interface AvatarSelectorProps {
   currentAvatarUrl?: string;
   onSelect: (avatarId: string) => void;
+  /** If false, selection is staged and not auto-applied */
+  autoSelect?: boolean;
+  /** Notifies parent of staged selection changes */
+  onSelectionChange?: (avatarId: string | null) => void;
   isLoading?: boolean;
 }
 
 export default function AvatarSelector({ 
   currentAvatarUrl, 
   onSelect, 
-  isLoading = false 
+  isLoading = false,
+  autoSelect = true,
+  onSelectionChange,
 }: AvatarSelectorProps) {
   const currentAvatarId = currentAvatarUrl ? extractAvatarPublicId(currentAvatarUrl) : null;
   const [selectedId, setSelectedId] = useState<string | null>(currentAvatarId);
 
   const handleSelect = (avatarId: string) => {
     setSelectedId(avatarId);
-    onSelect(avatarId);
+    if (onSelectionChange) onSelectionChange(avatarId);
+    if (autoSelect) onSelect(avatarId);
   };
 
   return (

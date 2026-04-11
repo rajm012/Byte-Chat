@@ -63,7 +63,7 @@ export async function blockUser(req: Request, res: Response) {
     await pool.query(
       `UPDATE chat_conversations 
        SET is_blocked = true, blocked_by_user_id = $1, updated_at = NOW()
-       WHERE (user1_id = LEAST($1, $2) AND user2_id = GREATEST($1, $2))`,
+       WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)`,
       [userId, blockedUserId]
     );
 
@@ -133,7 +133,7 @@ export async function unblockUser(req: Request, res: Response) {
     // Get the conversation ID to emit socket event
     const conversationQuery = await pool.query(
       `SELECT conversation_id FROM chat_conversations 
-       WHERE (user1_id = LEAST($1, $2) AND user2_id = GREATEST($1, $2))`,
+       WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)`,
       [userId, blockedUserId]
     );
 
@@ -145,7 +145,7 @@ export async function unblockUser(req: Request, res: Response) {
          SET is_blocked = false, 
              blocked_by_user_id = NULL,
              updated_at = NOW()
-         WHERE (user1_id = LEAST($1, $2) AND user2_id = GREATEST($1, $2))`,
+         WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)`,
         [userId, blockedUserId]
       );
 
@@ -167,7 +167,7 @@ export async function unblockUser(req: Request, res: Response) {
          SET is_blocked = true,
              blocked_by_user_id = $1,
              updated_at = NOW()
-         WHERE (user1_id = LEAST($2, $3) AND user2_id = GREATEST($2, $3))`,
+         WHERE (user1_id = $2 AND user2_id = $3) OR (user1_id = $3 AND user2_id = $2)`,
         [remainingBlockerId, userId, blockedUserId]
       );
 

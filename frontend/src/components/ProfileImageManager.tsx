@@ -1,9 +1,11 @@
-'use client';
+"use client";
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import Image from 'next/image';
 import ImageUploader from '@/components/ImageUploader';
 import AvatarSelector from '@/components/AvatarSelector';
 import { uploadProfilePicture, deleteProfilePicture, getUserAvatar, selectPresetAvatar } from '@/services/image.service';
+import { getAvatarUrl } from '@/utils/avatar.utils';
 import type { ProfileUser } from '@/types/auth.types';
 
 interface UserProfile {
@@ -29,6 +31,7 @@ export default function ProfileImageManager({
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
+  const [stagedAvatarId, setStagedAvatarId] = useState<string | null>(null);
 
   // Helper to map API profile user to UserProfile
   const mapUserToUserProfile = (user: ProfileUser): UserProfile => ({
@@ -71,7 +74,7 @@ export default function ProfileImageManager({
     setMessage(null);
 
     try {
-      const result = await uploadProfilePicture(file, '');
+      const result = await uploadProfilePicture(file);
       const user = result.data?.user;
 
       if (result.success && user) {
@@ -120,7 +123,7 @@ export default function ProfileImageManager({
     setMessage(null);
 
     try {
-      const result = await deleteProfilePicture('');
+      const result = await deleteProfilePicture();
       const user = result.data?.user;
       if (result.success && user) {
         const userProfile = mapUserToUserProfile(user);
@@ -162,7 +165,7 @@ export default function ProfileImageManager({
     setMessage(null);
 
     try {
-      const result = await selectPresetAvatar(avatarId, '');
+      const result = await selectPresetAvatar(avatarId);
       const user = result.data?.user;
       if (result.success && user) {
         const userProfile = mapUserToUserProfile(user);
@@ -243,14 +246,6 @@ export default function ProfileImageManager({
           <div className="space-y-6">
             {/* Upload Custom Image Section */}
             <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--grad-romance)' }}>
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold" style={{ color: 'var(--heading)' }}>Upload Custom Image</h3>
-              </div>
               <ImageUploader
                 key="profile-uploader-standalone"
                 currentImage={displayImageUrl}
@@ -296,10 +291,46 @@ export default function ProfileImageManager({
               
               {showAvatarSelector && (
                 <div className="mt-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full overflow-hidden border-2 relative">
+                        <Image
+                          src={stagedAvatarId ? getAvatarUrl(stagedAvatarId) : (displayImageUrl || '/static/default-avatar.png')}
+                          alt="Preview"
+                          width={64}
+                          height={64}
+                          sizes="64px"
+                          className="object-cover"
+                          priority
+                        />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">Selected avatar</h4>
+                        <p className="text-sm text-gray-500">Pick and apply a preset avatar</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { if (stagedAvatarId) handleAvatarSelect(stagedAvatarId); }}
+                        disabled={!stagedAvatarId || isLoading}
+                        className="px-4 py-2 bg-primary text-white rounded-md disabled:opacity-60"
+                      >
+                        Apply
+                      </button>
+                      <button
+                        onClick={() => setStagedAvatarId(null)}
+                        className="px-3 py-2 border rounded-md"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                   <AvatarSelector
                     currentAvatarUrl={displayImageUrl}
                     onSelect={handleAvatarSelect}
                     isLoading={isLoading}
+                    autoSelect={false}
+                    onSelectionChange={(id) => setStagedAvatarId(id)}
                   />
                 </div>
               )}
@@ -340,14 +371,6 @@ export default function ProfileImageManager({
       <div className="space-y-4">
         {/* Upload Custom Image Section */}
         <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--grad-romance)' }}>
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--heading)' }}>Upload Custom Image</h3>
-          </div>
           <ImageUploader
             key="profile-uploader-inline"
             currentImage={displayImageUrl}

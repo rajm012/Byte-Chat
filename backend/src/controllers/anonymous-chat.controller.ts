@@ -36,8 +36,8 @@ export async function createAnonymousConversation(req: Request, res: Response) {
     const blockCheck = await pool.query(
       `SELECT EXISTS(
         SELECT 1 FROM user_blocks 
-        WHERE (blocker_id = $1 AND blocked_id = $2) 
-           OR (blocker_id = $2 AND blocked_id = $1)
+        WHERE (blocker_id = $1::uuid AND blocked_id = $2::uuid) 
+           OR (blocker_id = $2::uuid AND blocked_id = $1::uuid)
       ) as is_blocked`,
       [userId, otherUserId]
     );
@@ -61,7 +61,7 @@ export async function createAnonymousConversation(req: Request, res: Response) {
     // Check if anonymous identity already exists for this user targeting the other user
     const existingAnonIdentity = await pool.query(
       `SELECT identity_id FROM anonymous_identities 
-       WHERE user_id = $1 AND target_user_id = $2 AND is_active = true
+       WHERE user_id = $1::uuid AND target_user_id = $2::uuid AND is_active = true
        ORDER BY created_at DESC LIMIT 1`,
       [userId, otherUserId]
     );
@@ -92,7 +92,7 @@ export async function createAnonymousConversation(req: Request, res: Response) {
     // console.log(`🔍 Checking for conversation with initiator: ${anonymousIdentityId}`);
     let conversation = await pool.query(
       `SELECT * FROM chat_conversations 
-       WHERE user1_id = $1 AND user2_id = $2 AND anonymous_initiator_id = $3`,
+       WHERE user1_id = $1::uuid AND user2_id = $2::uuid AND anonymous_initiator_id = $3::uuid`,
       [user1Id, user2Id, anonymousIdentityId]
     );
 
@@ -125,7 +125,7 @@ export async function createAnonymousConversation(req: Request, res: Response) {
 
           conversation = await pool.query(
             `SELECT * FROM chat_conversations 
-             WHERE user1_id = $1 AND user2_id = $2 AND anonymous_initiator_id = $3`,
+             WHERE user1_id = $1::uuid AND user2_id = $2::uuid AND anonymous_initiator_id = $3::uuid`,
             [user1Id, user2Id, anonymousIdentityId]
           );
 
@@ -236,7 +236,7 @@ export async function getAnonymousConversations(req: Request, res: Response) {
         AND ms.status != 'read'
         AND cm.sender_id != $1
       ) unread ON true
-      WHERE (cc.user1_id = $1 OR cc.user2_id = $1)
+      WHERE (cc.user1_id = $1::uuid OR cc.user2_id = $1::uuid)
       AND cc.is_blocked = false
       AND cc.is_anonymous = true
       AND cc.anonymous_initiator_id IS NOT NULL
@@ -272,8 +272,8 @@ export async function getAnonymousMessages(req: Request, res: Response) {
     // even after a conversation was converted from anonymous to normal)
     const convCheck = await pool.query(
       `SELECT * FROM chat_conversations 
-       WHERE conversation_id = $1 
-       AND (user1_id = $2 OR user2_id = $2)`,
+       WHERE conversation_id = $1::uuid 
+       AND (user1_id = $2::uuid OR user2_id = $2::uuid)`,
       [conversationId, userId]
     );
 
@@ -290,7 +290,7 @@ export async function getAnonymousMessages(req: Request, res: Response) {
     // Get the anonymous identity to check who initiated
     const anonIdentity = await pool.query(
       `SELECT user_id, random_string, display_gender, identity_id FROM anonymous_identities 
-       WHERE identity_id = $1`,
+       WHERE identity_id = $1::uuid`,
       [conversation.anonymous_initiator_id]
     );
 
@@ -402,8 +402,8 @@ export async function getAnonymousMessages(req: Request, res: Response) {
       LEFT JOIN anonymous_identities ai ON cc.anonymous_initiator_id = ai.identity_id
       LEFT JOIN chat_messages pm ON cm.parent_message_id = pm.message_id
       LEFT JOIN users pu ON pm.sender_id = pu.user_id
-      LEFT JOIN chat_session_keys sk ON cm.key_id = sk.session_key_id AND sk.encrypted_for_user_id = $2
-      WHERE cm.conversation_id = $1
+      LEFT JOIN chat_session_keys sk ON cm.key_id = sk.session_key_id AND sk.encrypted_for_user_id = $2::uuid
+      WHERE cm.conversation_id = $1::uuid
       ${before ? 'AND cm.created_at < $3' : ''}
       AND cm.is_deleted = false
       AND cm.deleted_for_everyone = false
@@ -419,7 +419,7 @@ export async function getAnonymousMessages(req: Request, res: Response) {
        FROM chat_messages cm
        WHERE ms.message_id = cm.message_id
          AND ms.user_id = $1
-         AND cm.conversation_id = $2
+         AND cm.conversation_id = $2::uuid
          AND cm.sender_id != $1
          AND ms.status != 'read'`,
       [userId, conversationId]
@@ -477,10 +477,10 @@ export async function sendAnonymousMessage(req: Request, res: Response) {
         ai.identity_id as existing_identity_id,
         u.gender
       FROM chat_conversations cc
-      LEFT JOIN anonymous_identities ai ON ai.conversation_id = cc.conversation_id AND ai.user_id = $2
-      LEFT JOIN users u ON u.user_id = $2
-      WHERE cc.conversation_id = $1 
-      AND (cc.user1_id = $2 OR cc.user2_id = $2)
+      LEFT JOIN anonymous_identities ai ON ai.conversation_id = cc.conversation_id AND ai.user_id = $2::uuid
+      LEFT JOIN users u ON u.user_id = $2::uuid
+      WHERE cc.conversation_id = $1::uuid 
+      AND (cc.user1_id = $2::uuid OR cc.user2_id = $2::uuid)
       AND cc.is_blocked = false
       AND cc.is_anonymous = true`,
       [conversationId, userId]
@@ -490,7 +490,7 @@ export async function sendAnonymousMessage(req: Request, res: Response) {
       // Debug: Check what's wrong
       const debugCheck = await pool.query(
         `SELECT conversation_id, user1_id, user2_id, is_blocked, is_anonymous
-         FROM chat_conversations WHERE conversation_id = $1`,
+         FROM chat_conversations WHERE conversation_id = $1::uuid`,
         [conversationId]
       );
 
@@ -560,7 +560,7 @@ export async function sendAnonymousMessage(req: Request, res: Response) {
 
       // Update last_used_at timestamp
       await pool.query(
-        'UPDATE anonymous_identities SET last_used_at = NOW() WHERE identity_id = $1',
+        'UPDATE anonymous_identities SET last_used_at = NOW() WHERE identity_id = $1::uuid',
         [anonymousIdentityId]
       );
     } else {
@@ -623,7 +623,7 @@ export async function sendAnonymousMessage(req: Request, res: Response) {
     // Emit socket event with anonymous sender info (fetch from DB for consistency)
     if (io) {
       const anonInfo = await pool.query(
-        'SELECT random_string, display_gender FROM anonymous_identities WHERE identity_id = $1',
+        'SELECT random_string, display_gender FROM anonymous_identities WHERE identity_id = $1::uuid',
         [anonymousIdentityId]
       );
 
@@ -662,7 +662,7 @@ export async function sendAnonymousMessage(req: Request, res: Response) {
           const keyResult = await pool.query(
             `SELECT aes_key_encrypted
              FROM chat_session_keys
-             WHERE session_key_id = $1 AND encrypted_for_user_id = $2
+             WHERE session_key_id = $1 AND encrypted_for_user_id = $2::uuid
              LIMIT 1`,
             [keyId, otherUserId]
           );
@@ -725,8 +725,8 @@ export async function revealAnonymousIdentity(req: Request, res: Response) {
       `SELECT cc.*, ai.user_id as initiator_user_id
        FROM chat_conversations cc
        LEFT JOIN anonymous_identities ai ON cc.anonymous_initiator_id = ai.identity_id
-       WHERE cc.conversation_id = $1 
-       AND (cc.user1_id = $2 OR cc.user2_id = $2)
+       WHERE cc.conversation_id = $1::uuid 
+       AND (cc.user1_id = $2::uuid OR cc.user2_id = $2::uuid)
        AND cc.is_anonymous = true`,
       [conversationId, userId]
     );
@@ -746,7 +746,7 @@ export async function revealAnonymousIdentity(req: Request, res: Response) {
     // Get user's anonymous identity in this conversation
     const anonResult = await pool.query(
       `SELECT * FROM anonymous_identities 
-       WHERE identity_id = $1`,
+       WHERE identity_id = $1::uuid`,
       [conversation.anonymous_initiator_id]
     );
 
@@ -767,7 +767,7 @@ export async function revealAnonymousIdentity(req: Request, res: Response) {
     // Check if regular conversation already exists between these users
     const existingConvCheck = await pool.query(
       `SELECT * FROM chat_conversations 
-       WHERE user1_id = $1 AND user2_id = $2 AND is_anonymous = false AND anonymous_initiator_id IS NULL`,
+       WHERE user1_id = $1::uuid AND user2_id = $2::uuid AND is_anonymous = false AND anonymous_initiator_id IS NULL`,
       [u1, u2]
     );
 
@@ -785,13 +785,13 @@ export async function revealAnonymousIdentity(req: Request, res: Response) {
       await pool.query(
         `UPDATE chat_messages 
          SET conversation_id = $1, was_anonymous_message = true
-         WHERE conversation_id = $2`,
+         WHERE conversation_id = $2::uuid`,
         [targetConversationId, conversationId]
       );
 
       // Soft-block the anonymous conversation to avoid duplicates
       await pool.query(
-        `UPDATE chat_conversations SET is_blocked = true WHERE conversation_id = $1`,
+        `UPDATE chat_conversations SET is_blocked = true WHERE conversation_id = $1::uuid`,
         [conversationId]
       );
     }
@@ -806,7 +806,7 @@ export async function revealAnonymousIdentity(req: Request, res: Response) {
       await pool.query(
         `UPDATE chat_messages 
          SET was_anonymous_message = true
-         WHERE conversation_id = $1`,
+         WHERE conversation_id = $1::uuid`,
         [conversationId]
       );
 
@@ -814,7 +814,7 @@ export async function revealAnonymousIdentity(req: Request, res: Response) {
       await pool.query(
         `UPDATE chat_conversations 
          SET is_anonymous = false, anonymous_initiator_id = NULL
-         WHERE conversation_id = $1`,
+         WHERE conversation_id = $1::uuid`,
         [conversationId]
       );
     }
@@ -823,7 +823,7 @@ export async function revealAnonymousIdentity(req: Request, res: Response) {
     await pool.query(
       `UPDATE anonymous_identities 
        SET is_revealed = true, revealed_at = NOW()
-       WHERE identity_id = $1`,
+       WHERE identity_id = $1::uuid`,
       [anonIdentity.identity_id]
     );
 
@@ -886,7 +886,7 @@ export async function updateAnonymousName(req: Request, res: Response) {
       `SELECT ai.*, cc.user1_id, cc.user2_id, cc.conversation_id
        FROM anonymous_identities ai
        LEFT JOIN chat_conversations cc ON ai.identity_id = cc.anonymous_initiator_id
-       WHERE ai.identity_id = $1`,
+       WHERE ai.identity_id = $1::uuid`,
       [identityId]
     );
 
@@ -915,7 +915,7 @@ export async function updateAnonymousName(req: Request, res: Response) {
     const result = await pool.query(
       `UPDATE anonymous_identities 
        SET random_string = $1, last_used_at = NOW()
-       WHERE identity_id = $2
+       WHERE identity_id = $2::uuid
        RETURNING identity_id, user_id, random_string, display_gender`,
       [uniqueName, identityId]
     );

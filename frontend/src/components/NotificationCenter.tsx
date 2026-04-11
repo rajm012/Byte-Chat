@@ -91,7 +91,7 @@ function resolveNotificationMeta(notification: Record<string, unknown>): Notific
     return {
       title: notificationTitle(type),
       body: notificationBody(notification),
-      href: `/chat/${conversationId}`,
+      href: `/chat?conversationId=${conversationId}`,
       actionLabel: 'Open Chat',
     };
   }

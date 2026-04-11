@@ -1,21 +1,9 @@
 'use client';
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-  useRef,
-} from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import {
-  clearAllNotifications,
-  clearConversationNotifications,
-  deleteNotificationById,
-  fetchNotifications,
-  type AppNotification,
-} from '@/services/notification.service';
+import {clearAllNotifications, clearConversationNotifications, deleteNotificationById, 
+  fetchNotifications, type AppNotification } from '@/services/notification.service';
 import { useSocket } from '@/contexts/SocketContext';
 import { authService } from '@/services/auth.service';
 
@@ -57,19 +45,32 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const data = await fetchNotifications();
       setNotifications(data.notifications);
       setCount(data.count);
-    } catch {
-      // User might not be signed in yet — ignore silently
+    } catch (err) {
+      console.error('[Notifications] Failed to fetch:', err);
     }
   }, []);
 
   // Fetch on mount (when there is an access token available)
   useEffect(() => {
-    if (authService.getCurrentUser()) {
+    const user = authService.getCurrentUser();
+    const token = localStorage.getItem('token');
+    if (user || token) {
       const timer = window.setTimeout(() => {
         void refresh();
-      }, 0);
+      }, 300); // Slightly faster
       return () => window.clearTimeout(timer);
     }
+  }, [refresh]);
+
+  // Refresh on window focus (in case user missed notifications)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (authService.getCurrentUser()) {
+        void refresh();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, [refresh]);
 
   // Listen for real-time notifications pushed by the backend via socket
@@ -105,12 +106,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }, targetDelay);
     };
 
-    const handleNewNotification = (payload: {
-      notification: AppNotification;
-      count: number;
-    }) => {
+    const handleNewNotification = (payload: { notification: AppNotification; count: number }) => {
       pendingNotificationsRef.current.push(payload.notification);
       pendingCountRef.current = payload.count;
+      setCount(payload.count);
       scheduleRealtimeFlush();
     };
 
