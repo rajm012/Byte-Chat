@@ -246,6 +246,18 @@ export default function GroupChatPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showPollTypeMenu]);
 
+  // Refs to access latest values in socket handlers without re-registering listeners
+  const sessionKeyRef = useRef(sessionKey);
+  const currentUserIdRef = useRef(currentUserId);
+
+  useEffect(() => {
+    sessionKeyRef.current = sessionKey;
+  }, [sessionKey]);
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
   // Socket event listeners
   useEffect(() => {
     if (!socket) return;
@@ -253,17 +265,19 @@ export default function GroupChatPage() {
     const handleNewGroupMessage = async (message: GroupMessage) => {
       const userStr = localStorage.getItem('user');
       const currentUser = userStr ? JSON.parse(userStr) : null;
-      const currentUserId = currentUser?.user_id || currentUser?.userId;
+      const userId = currentUser?.user_id || currentUser?.userId;
 
       const processedMessage = { ...message };
 
-      if (sessionKey && message.encrypted_content) {
+      // Use ref to get latest sessionKey
+      const currentSessionKey = sessionKeyRef.current;
+      if (currentSessionKey && message.encrypted_content) {
         try {
           const decrypted = await decryptMessageAES(
             message.encrypted_content,
             message.content_iv || '',
             message.content_auth_tag || '',
-            sessionKey
+            currentSessionKey
           );
           processedMessage.encrypted_content = decrypted;
         } catch (err) {
@@ -273,7 +287,7 @@ export default function GroupChatPage() {
 
       setMessages((prev) => [...prev, {
         ...processedMessage,
-        is_my_message: message.sender_id === currentUserId || (message.sender?.user_id === currentUserId),
+        is_my_message: message.sender_id === userId || (message.sender?.user_id === userId),
       }]);
     };
 
@@ -293,7 +307,8 @@ export default function GroupChatPage() {
     };
 
     const handleTyping = ({ userId, isTyping }: { userId: string; isTyping: boolean }) => {
-      if (userId === currentUserId) return;
+      // Use ref to get latest currentUserId
+      if (userId === currentUserIdRef.current) return;
       setTypingUsers(prev => {
         if (isTyping) {
           if (!prev.includes(userId)) return [...prev, userId];
@@ -317,7 +332,8 @@ export default function GroupChatPage() {
       socket.off('poll-cancelled', handlePollCancelled);
       socket.off('user-typing', handleTyping);
     };
-  }, [socket, sessionKey, currentUserId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -544,10 +560,58 @@ export default function GroupChatPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#e2fffe] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-14 h-14 rounded-full border-4 border-[#87ceeb] border-t-transparent mx-auto mb-4 animate-spin" />
-          <p className="text-sm text-[#0c6780]">Loading chat…</p>
+      <div className="min-h-screen bg-[#e2fffe] font-sans text-[#002020]">
+        {/* Background blur overlay */}
+        <div className="fixed inset-0 bg-[#002020]/20 backdrop-blur-md z-40 flex items-center justify-center p-4">
+          {/* Chat Modal Container */}
+          <div className="w-full h-full md:w-[90%] md:h-[85%] bg-white/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,32,32,0.06)] relative overflow-hidden flex flex-col border border-white/50">
+            {/* Close Button */}
+            <div className="absolute top-4 right-4 z-50 p-2 hover:bg-red-100/50 rounded-full transition-colors group">
+              <span className="material-symbols-outlined text-[#6f787d] group-hover:text-red-600">close</span>
+            </div>
+
+            {/* Header Skeleton */}
+            <header className="h-16 px-6 flex items-center justify-between border-b border-white/50 bg-white/60 backdrop-blur-sm shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#87ceeb]/30 animate-pulse" />
+                <div className="space-y-1">
+                  <div className="h-4 w-32 bg-[#87ceeb]/30 rounded animate-pulse" />
+                  <div className="h-3 w-24 bg-[#87ceeb]/20 rounded animate-pulse" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-full bg-[#87ceeb]/20 animate-pulse" />
+                <div className="w-9 h-9 rounded-full bg-[#87ceeb]/20 animate-pulse" />
+              </div>
+            </header>
+
+            {/* Messages Skeleton */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {[
+                { isMyMessage: false, width: 'w-2/3' },
+                { isMyMessage: true, width: 'w-1/2' },
+                { isMyMessage: false, width: 'w-3/4' },
+                { isMyMessage: true, width: 'w-2/5' },
+                { isMyMessage: false, width: 'w-1/2' },
+                { isMyMessage: true, width: 'w-3/5' },
+              ].map((item, i) => (
+                <div key={i} className={`flex ${item.isMyMessage ? 'justify-end' : 'justify-start'} animate-pulse`}>
+                  {!item.isMyMessage && <div className="w-8 h-8 rounded-full bg-[#87ceeb]/20 mr-2 self-end" />}
+                  <div className={`${item.width} h-14 bg-[#87ceeb]/20 rounded-2xl ${item.isMyMessage ? 'rounded-br-sm' : 'rounded-bl-sm'}`} />
+                </div>
+              ))}
+            </div>
+
+            {/* Input Skeleton */}
+            <div className="px-4 py-3 bg-white/60 backdrop-blur-sm border-t border-white/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#87ceeb]/20 animate-pulse" />
+                <div className="flex-1 h-11 bg-[#87ceeb]/20 rounded-full animate-pulse" />
+                <div className="w-10 h-10 rounded-full bg-[#87ceeb]/20 animate-pulse" />
+                <div className="w-11 h-11 rounded-full bg-[#87ceeb]/30 animate-pulse" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

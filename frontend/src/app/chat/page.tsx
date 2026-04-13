@@ -121,6 +121,17 @@ interface MessageItemProps {
   formatTime: (date: string | Date) => string;
 }
 
+// Typing indicator component (animated dots)
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-1 mt-1">
+      <span className="w-2 h-2 bg-[#6f787d] dark:bg-[#bfc8cd] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+      <span className="w-2 h-2 bg-[#6f787d] dark:bg-[#bfc8cd] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+      <span className="w-2 h-2 bg-[#6f787d] dark:bg-[#bfc8cd] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+    </div>
+  );
+}
+
 function MessageItem({ msg, onReply, onEdit, onDelete, onReact, formatTime }: MessageItemProps) {
   const [showActions, setShowActions] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -412,6 +423,9 @@ function MessageItem({ msg, onReply, onEdit, onDelete, onReact, formatTime }: Me
 }
 
 export default function ChatPage() {
+  // Typing indicator state
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chatRequests, setChatRequests] = useState<ChatRequest[]>([]);
@@ -460,7 +474,20 @@ export default function ChatPage() {
   const [isE2EEReady, setIsE2EEReady] = useState(false);
   const [userPrivateKey, setUserPrivateKey] = useState<CryptoKey | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { getSocket, isConnected } = useSocket();
+  const { getSocket, isConnected, joinConversation, leaveConversation } = useSocket();
+  const socket = getSocket();
+  // Join and leave the active conversation room for real-time events.
+  useEffect(() => {
+    if (!isConnected || !selectedConversation) return;
+
+    const conversationId = selectedConversation.conversation_id;
+    joinConversation(conversationId);
+
+    return () => {
+      leaveConversation(conversationId);
+    };
+  }, [isConnected, selectedConversation, joinConversation, leaveConversation]);
+
   const conversationsRef = useRef<Conversation[]>([]);
   const pendingRealtimeUpdatesRef = useRef<Map<string, { incrementBy: number; timestamp?: number }>>(new Map());
   const flushTimerRef = useRef<number | null>(null);
@@ -662,6 +689,68 @@ export default function ChatPage() {
       return decryptedMsg;
     }));
   }, []);
+
+  // Real-time message + typing listeners for the selected conversation.
+  useEffect(() => {
+    if (!isConnected || !socket || !selectedConversation) return;
+
+    const activeConversationId = selectedConversation.conversation_id;
+    const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+    const currentUserId = userStr ? JSON.parse(userStr).user_id : null;
+
+    const handleNewMessage = async (incomingMessage: Message) => {
+      if (incomingMessage.conversation_id !== activeConversationId) return;
+
+      let processedMessage: Message = {
+        ...incomingMessage,
+        is_my_message: incomingMessage.sender_id === currentUserId,
+      };
+
+      if (sessionKey) {
+        try {
+          const decryptedArray = await decryptMessages([processedMessage], sessionKey);
+          const decrypted = decryptedArray[0];
+          if (decrypted) {
+            processedMessage = decrypted;
+          }
+        } catch (err) {
+          console.warn('[Socket] Failed to decrypt realtime message:', err);
+        }
+      }
+
+      setMessages((prev) => {
+        const existingIndex = prev.findIndex((msg) => msg.message_id === processedMessage.message_id);
+        if (existingIndex === -1) {
+          return [...prev, processedMessage];
+        }
+
+        const next = [...prev];
+        next[existingIndex] = processedMessage;
+        return next;
+      });
+    };
+
+    const handleTyping = (data: { userId: string; chatId: string; isTyping: boolean }) => {
+      if (data.chatId !== activeConversationId || data.userId === currentUserId) return;
+
+      if (data.isTyping) {
+        setIsOtherTyping(true);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => setIsOtherTyping(false), 2000);
+      } else {
+        setIsOtherTyping(false);
+      }
+    };
+
+    socket.on('new-message', handleNewMessage);
+    socket.on('user-typing', handleTyping);
+
+    return () => {
+      socket.off('new-message', handleNewMessage);
+      socket.off('user-typing', handleTyping);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, [isConnected, socket, selectedConversation, sessionKey, decryptMessages]);
 
   const loadMessages = useCallback(async (conversation: Conversation) => {
     if (!conversation) return;
@@ -1108,11 +1197,96 @@ export default function ChatPage() {
 
   if (loading) {
     return (
-      <div className={`min-h-screen bg-[#e2fffe] flex items-center justify-center ${isDarkMode ? 'dark' : ''}`}>
-        <div className="dark:bg-[#002020] dark:text-[#87ceeb] min-h-screen w-full flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-14 h-14 rounded-full border-4 border-[#87ceeb] dark:border-[#0c6780] border-t-transparent mx-auto mb-4 animate-spin" />
-            <p className="text-sm text-[#0c6780] dark:text-[#87ceeb]">Loading messages…</p>
+      <div className={`min-h-screen bg-[#e2fffe] font-sans text-[#002020] ${isDarkMode ? 'dark' : ''}`}>
+        <div className="dark:bg-[#002020] dark:text-[#e7fffe] min-h-screen">
+          <div className="fixed inset-0 bg-[#002020]/20 dark:bg-black/40 backdrop-blur-md z-40 flex items-center justify-center p-4">
+            <div className="w-full h-full md:w-[95%] md:h-[95%] bg-white/80 dark:bg-[#003535]/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,32,32,0.06)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative overflow-hidden flex flex-col md:flex-row border border-white/50 dark:border-[#004a4a]/50">
+              {/* Sidebar with conversation skeleton */}
+              <aside className="w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative">
+                {/* Header */}
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h1 className="text-2xl font-extrabold tracking-tight text-[#0c6780] dark:text-[#87ceeb] font-['Plus_Jakarta_Sans']">Messages</h1>
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
+                      <div className="w-10 h-10 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
+                    </div>
+                  </div>
+                  {/* Search */}
+                  <div className="relative">
+                    <div className="w-full bg-white dark:bg-[#004040] rounded-full py-2.5 pl-10 pr-4 h-10 animate-pulse" />
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="px-6 pb-2 flex gap-2">
+                  <div className="h-9 w-28 bg-[#87ceeb]/30 dark:bg-[#0c6780]/30 rounded-full animate-pulse" />
+                  <div className="h-9 w-28 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded-full animate-pulse" />
+                </div>
+
+                {/* Conversation list skeleton */}
+                <div className="flex-1 overflow-y-auto px-4 space-y-1">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl animate-pulse">
+                      <div className="w-12 h-12 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20" />
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="h-3.5 w-3/4 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded" />
+                          <div className="h-2.5 w-8 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded" />
+                        </div>
+                        <div className="h-3 w-1/2 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded" />
+                      </div>
+                      <div className="w-5 h-5 rounded-full bg-[#f9b1bc]/50 animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              </aside>
+
+              {/* Main chat area skeleton */}
+              <main className="hidden md:flex flex-1 flex-col bg-white/50 dark:bg-[#003535]/30 min-h-0">
+                {/* Chat header skeleton */}
+                <div className="px-6 py-4 bg-white/30 dark:bg-[#003535]/30 backdrop-blur-md border-b border-white/30 dark:border-[#004a4a]/30 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
+                    <div className="space-y-1">
+                      <div className="h-4 w-32 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded animate-pulse" />
+                      <div className="h-3 w-20 bg-[#22C55E]/30 rounded animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
+                    <div className="w-9 h-9 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
+                  </div>
+                </div>
+
+                {/* Messages skeleton */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {[
+                    { isMyMessage: false, width: 'w-2/3' },
+                    { isMyMessage: true, width: 'w-1/2' },
+                    { isMyMessage: false, width: 'w-3/4' },
+                    { isMyMessage: true, width: 'w-2/5' },
+                    { isMyMessage: false, width: 'w-1/2' },
+                    { isMyMessage: true, width: 'w-3/5' },
+                  ].map((item, i) => (
+                    <div key={i} className={`flex ${item.isMyMessage ? 'justify-end' : 'justify-start'} animate-pulse`}>
+                      {!item.isMyMessage && <div className="w-8 h-8 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 mr-2 self-end" />}
+                      <div className={`${item.width} h-16 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded-2xl ${item.isMyMessage ? 'rounded-br-sm' : 'rounded-bl-sm'}`} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Input area skeleton */}
+                <div className="px-4 py-3 bg-white/50 dark:bg-[#003535]/50 backdrop-blur-md border-t border-white/30 dark:border-[#004a4a]/30">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
+                    <div className="flex-1 h-11 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded-full animate-pulse" />
+                    <div className="w-10 h-10 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
+                    <div className="w-11 h-11 rounded-full bg-[#87ceeb]/30 dark:bg-[#0c6780]/30 animate-pulse" />
+                  </div>
+                </div>
+              </main>
+            </div>
           </div>
         </div>
       </div>
@@ -1469,6 +1643,14 @@ export default function ChatPage() {
                       );
                     });
                   })()}
+                  {/* Typing indicator UI */}
+                  {isOtherTyping && (
+                    <div className="flex justify-start">
+                      <div className="bg-white dark:bg-[#004040] rounded-2xl rounded-bl-sm p-3 shadow-sm">
+                        <TypingIndicator />
+                      </div>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
 
@@ -1567,7 +1749,25 @@ export default function ChatPage() {
                       placeholder={isBlocked ? "Cannot send message - user is blocked" : "Type a message..."}
                       type="text"
                       value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
+                      onChange={(e) => {
+                        setMessageInput(e.target.value);
+                        // Send typing event
+                        if (selectedConversation && isConnected && socket) {
+                          socket.emit('typing', {
+                            chatId: selectedConversation.conversation_id,
+                            chatType: 'conversation',
+                            isTyping: true,
+                          });
+                          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                          typingTimeoutRef.current = setTimeout(() => {
+                            socket.emit('typing', {
+                              chatId: selectedConversation.conversation_id,
+                              chatType: 'conversation',
+                              isTyping: false,
+                            });
+                          }, 2000);
+                        }
+                      }}
                       onKeyDown={(e) => e.key === 'Enter' && !sending && handleSendMessage()}
                       disabled={sending || isBlocked}
                     />

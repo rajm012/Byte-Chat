@@ -857,6 +857,28 @@ export default function ChatWindowPage() {
     }
   };
 
+  // Refs to access latest values in socket handlers without re-registering listeners
+  const sessionKeyRef = useRef(sessionKey);
+  const decryptMessagesRef = useRef(decryptMessages);
+  const fetchMessagesRef = useRef(fetchMessages);
+  const toastRef = useRef(toast);
+
+  useEffect(() => {
+    sessionKeyRef.current = sessionKey;
+  }, [sessionKey]);
+
+  useEffect(() => {
+    decryptMessagesRef.current = decryptMessages;
+  }, [decryptMessages]);
+
+  useEffect(() => {
+    fetchMessagesRef.current = fetchMessages;
+  }, [fetchMessages]);
+
+  useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
+
   // Listen for new messages via socket
   useEffect(() => {
     if (!socket) return;
@@ -871,10 +893,15 @@ export default function ChatWindowPage() {
         is_my_message: message.sender_id === currentUserId,
       };
 
-      // Decrypt if E2EE is ready
-      if (sessionKey) {
-        const decryptedArray = await decryptMessages([processedMessage], sessionKey);
-        processedMessage = decryptedArray[0];
+      // Decrypt if E2EE is ready - use ref to get latest sessionKey
+      const currentSessionKey = sessionKeyRef.current;
+      if (currentSessionKey) {
+        try {
+          const decryptedArray = await decryptMessagesRef.current([processedMessage], currentSessionKey);
+          processedMessage = decryptedArray[0];
+        } catch (err) {
+          console.warn('[Socket] Failed to decrypt realtime message:', err);
+        }
       }
 
       setMessages((prev) => {
@@ -895,31 +922,30 @@ export default function ChatWindowPage() {
       if (userId !== currentUserId) {
         setIsOtherTyping(isTyping);
       }
-      // console.log(`User ${userId} is ${isTyping ? 'typing' : 'not typing'}`);
     };
 
     const handleIdentityRevealed = () => {
       // Refresh messages when identity is revealed
       setIsAnonymous(false);
-      fetchMessages();
+      fetchMessagesRef.current();
     };
 
     const handleUserBlocked = () => {
       setIsBlocked(true);
-      toast.warning('This conversation has been blocked');
+      toastRef.current.warning('This conversation has been blocked');
     };
 
     const handleConversationUnblocked = ({ canMessageNow }: { conversationId: string; canMessageNow: boolean; unblockedBy: string }) => {
       setIsBlocked(false);
       console.log('🔓 Conversation unblocked - you can now send messages', canMessageNow);
       // Refresh conversation to get latest state
-      fetchMessages();
+      fetchMessagesRef.current();
     };
 
     const handleConversationStillBlocked = ({ blockedBy }: { conversationId: string; blockedBy: string }) => {
       console.log('⚠️ Conversation still blocked by other user', blockedBy);
       // Refresh conversation to get latest state
-      fetchMessages();
+      fetchMessagesRef.current();
     };
 
     socket.on('new-message', handleNewMessage);
@@ -937,7 +963,8 @@ export default function ChatWindowPage() {
       socket.off('conversation-unblocked', handleConversationUnblocked);
       socket.off('conversation-still-blocked', handleConversationStillBlocked);
     };
-  }, [socket, toast, fetchMessages, sessionKey, decryptMessages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
 
 
   const handleBlockUser = async () => {
@@ -1292,10 +1319,13 @@ export default function ChatWindowPage() {
             })()}
             {!searchQuery.trim() && isOtherTyping && (
               <div className="flex animate-fade-in my-2">
-                <div className="glass-strong rounded-2xl px-4 py-3 flex gap-1 bg-white/5 items-center w-fit">
-                  <span className="typing-dot" style={{ background: 'var(--muted)', width: 6, height: 6, borderRadius: '50%' }} />
-                  <span className="typing-dot" style={{ background: 'var(--muted)', width: 6, height: 6, borderRadius: '50%' }} />
-                  <span className="typing-dot" style={{ background: 'var(--muted)', width: 6, height: 6, borderRadius: '50%' }} />
+                <div className="bg-white/60 rounded-2xl px-4 py-2 flex gap-2 items-center w-fit shadow-md">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-[#87ceeb] rounded-full animate-bounce" />
+                    <span className="w-1.5 h-1.5 bg-[#87ceeb] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <span className="w-1.5 h-1.5 bg-[#87ceeb] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  </div>
+                  <span className="text-xs text-[#6f787d]">Typing…</span>
                 </div>
               </div>
             )}

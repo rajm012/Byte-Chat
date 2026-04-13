@@ -13,5 +13,3 @@ frontend/.env
 frontend/.next/
 
 backend/dist/
-
-stitch/

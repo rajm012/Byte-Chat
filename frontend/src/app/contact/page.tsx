@@ -238,7 +238,7 @@ export default function ContactPage() {
             </p>
             <div className="space-y-3">
               <a
-                href="mailto:b23397@students.iitmandi.ac.in"
+                href="contact@bytechat.in"
                 className="btn-romance flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-xl"
               >
                 <FiMail className="w-4 h-4" />

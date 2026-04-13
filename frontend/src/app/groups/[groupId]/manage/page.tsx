@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
 import { groupService } from '@/services/group.service';
 import type { User } from '@/types/chat.types';
 import { useToast } from '@/contexts/ToastContext';
@@ -22,6 +23,18 @@ interface GroupMember {
   anonymous_gender: string | null;
 }
 
+interface GroupDetails {
+  group_id: string;
+  group_name: string;
+  group_desc: string;
+  group_dp_url?: string;
+  is_public: boolean;
+  max_members: number;
+  member_count: number;
+  user_is_owner: boolean;
+  user_is_admin: boolean;
+}
+
 export default function ManageGroupPage() {
   const router = useRouter();
   const params = useParams();
@@ -30,34 +43,30 @@ export default function ManageGroupPage() {
 
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [group, setGroup] = useState<GroupDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddMember, setShowAddMember] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isOwner, setIsOwner] = useState(false);
-  const [groupIsPrivate, setGroupIsPrivate] = useState(false);
+  const [activeTab, setActiveTab] = useState<'members' | 'pending'>('members');
 
   const fetchData = useCallback(async () => {
     try {
-      // Fetch group details to check if user is owner and if group is private
       const groupDetails = await groupService.getGroupDetails(groupId);
       if (groupDetails.success && groupDetails.data) {
-        setIsOwner(groupDetails.data.group.user_is_owner);
-        setGroupIsPrivate(!groupDetails.data.group.is_public);
+        setGroup(groupDetails.data.group);
       }
 
-      // Fetch group members
       const membersResponse = await groupService.getGroupMembers(groupId);
       if (membersResponse.success && membersResponse.data) {
         setMembers(membersResponse.data.members);
       }
 
-      // Fetch all users for adding members
       const { API_BASE_URL } = await import('../../../../services/apiBase');
       const usersResponse = await fetch(`${API_BASE_URL}/api/profile/all`, {
         credentials: 'include',
       });
-      
+    
       if (usersResponse.ok) {
         const usersData = await usersResponse.json();
         if (usersData.success && usersData.data) {
@@ -72,7 +81,7 @@ export default function ManageGroupPage() {
       }
       setError(errorMsg);
       toast.error(errorMsg);
-    }
+    } 
     finally {
       setLoading(false);
     }
@@ -94,7 +103,6 @@ export default function ManageGroupPage() {
       if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as { message?: string }).message === 'string') {
         errorMsg = (err as { message: string }).message;
       }
-      // setError(errorMsg);
       toast.error(errorMsg);
     }
   };
@@ -103,7 +111,6 @@ export default function ManageGroupPage() {
     if (!confirm(`Are you sure you want to remove ${memberName}?`)) {
       return;
     }
-
     try {
       await groupService.removeMemberFromGroup(groupId, memberId);
       fetchData();
@@ -113,7 +120,6 @@ export default function ManageGroupPage() {
       if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as { message?: string }).message === 'string') {
         errorMsg = (err as { message: string }).message;
       }
-      // setError(errorMsg);
       toast.error(errorMsg);
     }
   };
@@ -122,7 +128,7 @@ export default function ManageGroupPage() {
     if (!confirm(`Are you sure you want to promote ${memberName} to admin?`)) {
       return;
     }
-
+    
     try {
       await groupService.promoteMemberToAdmin(groupId, memberId);
       fetchData();
@@ -132,12 +138,10 @@ export default function ManageGroupPage() {
       if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as { message?: string }).message === 'string') {
         errorMsg = (err as { message: string }).message;
       }
-      // setError(errorMsg);
       toast.error(errorMsg);
     }
   };
 
-  // Filter users not already in the group
   const availableUsers = allUsers.filter(
     user => !members.find(m => m.user_id === user.user_id)
   );
@@ -149,148 +153,203 @@ export default function ManageGroupPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-mesh-warm flex items-center justify-center">
-        <div className="text-center animate-fade-in">
-          <div className="w-16 h-16 rounded-full border-4 border-transparent mx-auto mb-4 animate-spin"
-            style={{ borderTopColor: 'var(--pink)', borderRightColor: 'var(--coral)' }} />
-          <p className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Loading members…</p>
-        </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#002020]/40 backdrop-blur-md">
+        <div className="w-16 h-16 rounded-full border-4 border-[#87ceeb] border-t-transparent animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-mesh-warm antialiased">
-      {/* Decorative blobs */}
-      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-linear-to-br from-purple-300/10 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-[-10%] left-[-5%] w-80 h-80 bg-linear-to-tr from-pink-300/10 to-transparent rounded-full blur-3xl" />
-      </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-black/40 backdrop-blur-md dark:bg-black/60">
+      <div className="relative w-full max-w-4xl h-[85vh] bg-white dark:bg-[#003535] rounded-3xl shadow-[0_40px_80px_rgba(0,32,32,0.2)] dark:shadow-[0_40px_80px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden">
+        <button 
+          onClick={() => router.back()}
+          className="absolute top-4 right-4 z-20 w-10 h-10 flex items-center justify-center rounded-full bg-white text-[#002020] hover:bg-gray-100 transition-all shadow-lg dark:bg-[#004a4a] dark:text-white dark:hover:bg-[#005555]"
+        >
+          <span className="material-symbols-outlined">close</span>
+        </button>
 
-      {/* Nav */}
-      <header className="glass-nav sticky top-0 z-20 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="btn-ghost w-9 h-9 rounded-full flex items-center justify-center text-lg">←</button>
-          <div>
-            <p className="font-bold text-sm" style={{ color: 'var(--heading)' }}>Manage Members</p>
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>{members.length} member{members.length !== 1 ? 's' : ''}</p>
+        <div className="flex items-center gap-4 p-5 border-b border-gray-200 dark:border-[#004a4a]">
+          {group?.group_dp_url ? (
+            <Image src={group.group_dp_url} alt={group.group_name} width={48} height={48}
+              className="w-12 h-12 rounded-xl object-cover" />
+          ) : (
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold bg-linear-to-br from-[#87ceeb] to-[#0c6780]">
+              {group?.group_name?.charAt(0).toUpperCase() || 'G'}
+            </div>
+          )}
+          <div className="flex-1 min-w-0 pr-12">
+            <h2 className="text-lg font-bold text-[#002020] dark:text-[#e7fffe] truncate">{group?.group_name}</h2>
+            <p className="text-sm text-[#6f787d] dark:text-[#bfc8cd]">
+              {members.length} members · {group?.is_public ? 'Public' : 'Private'}
+            </p>
           </div>
         </div>
-        <button onClick={() => setShowAddMember(true)} className="btn-romance px-4 py-2 text-sm">+ Add Member</button>
-      </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6">
+        <div className="flex border-b border-gray-200 dark:border-[#004a4a]">
+          <button
+            onClick={() => setActiveTab('members')}
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'members' 
+                ? 'text-[#0c6780] dark:text-[#87ceeb] border-b-2 border-[#87ceeb]' 
+                : 'text-[#6f787d] dark:text-[#bfc8cd]'
+            }`}
+          >
+            <span className="material-symbols-outlined mr-1 text-sm">group</span>
+            Members ({members.length})
+          </button>
+        </div>
+
         {error && (
-          <div className="glass rounded-2xl p-4 mb-4 bg-red-500/10 border border-red-500/20">
-            <p className="text-red-400 text-sm">{error}</p>
+          <div className="mx-5 mt-3 rounded-xl p-3 bg-red-500/10 border border-red-400/30 text-red-400 text-sm">
+            {error}
           </div>
         )}
 
-        {/* Members list */}
-        <div className="glass-strong rounded-3xl p-4 space-y-2">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {members.map((member) => (
-            <div key={member.member_id} className="glass rounded-2xl p-4 flex items-center gap-4">
-              {/* Avatar */}
-              {member.dp_url ? (
-                <Image src={member.dp_url} alt={member.name} width={44} height={44}
-                  className="rounded-xl object-cover shrink-0 w-11 h-11" />
+            <div key={member.member_id} className="flex items-center gap-3 p-3 bg-[#f5f5f5] dark:bg-[#004040] rounded-xl">
+              {member.dp_url && !member.is_anonymous ? (
+                <Image src={member.dp_url} alt={member.name} width={40} height={40}
+                  className="w-10 h-10 rounded-lg object-cover shrink-0" />
               ) : (
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-base shrink-0"
-                  style={{ background: member.is_anonymous ? 'var(--grad-mystery)' : 'var(--grad-romance)' }}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold shrink-0 ${
+                  member.is_anonymous 
+                    ? 'bg-linear-to-br from-gray-500 to-gray-700' 
+                    : 'bg-linear-to-br from-[#87ceeb] to-[#ffb6c1]'
+                }`}>
                   {member.is_anonymous ? '🎭' : (member.name?.charAt(0).toUpperCase() || '?')}
                 </div>
               )}
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-semibold text-sm truncate" style={{ color: 'var(--heading)' }}>
+                  <span className="font-medium text-sm text-[#002020] dark:text-[#e7fffe] truncate">
                     {member.is_anonymous ? (member.anonymous_name || 'Anonymous') : member.name}
                   </span>
                   {member.is_owner && (
-                    <span className="px-1.5 py-0.5 rounded-md text-xs font-semibold bg-purple-500/15 text-purple-400">👑 Owner</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center gap-0.5">
+                      <span className="material-symbols-outlined text-[10px]">crown</span>
+                      Owner
+                    </span>
                   )}
                   {member.is_admin && !member.is_owner && (
-                    <span className="px-1.5 py-0.5 rounded-md text-xs font-semibold bg-blue-500/15 text-blue-400">🛡️ Admin</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center gap-0.5">
+                      <span className="material-symbols-outlined text-[10px]">shield</span>
+                      Admin
+                    </span>
                   )}
                   {member.is_anonymous && (
-                    <span className="px-1.5 py-0.5 rounded-md text-xs font-semibold bg-purple-500/10 text-purple-300">🎭 Anon</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                      Anonymous
+                    </span>
                   )}
                 </div>
-                <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted)' }}>
+                <p className="text-xs text-[#6f787d] dark:text-[#bfc8cd] truncate">
                   {member.is_anonymous
-                    ? `${member.anonymous_gender || 'Unknown'} · Anonymous`
+                    ? `${member.anonymous_gender || 'Unknown'}`
                     : `${member.roll_no} · ${member.branch}`}
                 </p>
-                <p className="text-xs" style={{ color: 'var(--muted)', opacity: 0.6 }}>
-                  Joined {new Date(member.joined_at).toLocaleDateString()}
-                </p>
               </div>
-
-              <div className="flex flex-col gap-1.5 shrink-0">
-                {isOwner && !member.is_admin && !member.is_owner && (
-                  <button onClick={() => handlePromoteMember(member.member_id, member.is_anonymous ? (member.anonymous_name || 'Anonymous') : member.name)}
-                    className="btn-ghost px-3 py-1 text-xs rounded-xl text-blue-400">
-                    Make Admin
+              <div className="flex items-center gap-1 shrink-0">
+                {group?.user_is_owner && !member.is_admin && !member.is_owner && (
+                  <button 
+                    onClick={() => handlePromoteMember(member.member_id, member.is_anonymous ? (member.anonymous_name || 'Anonymous') : member.name)}
+                    className="p-2 rounded-lg hover:bg-[#e2fffe] dark:hover:bg-[#005555] text-[#0c6780] dark:text-[#87ceeb] transition-colors"
+                    title="Make Admin"
+                  >
+                    <span className="material-symbols-outlined text-sm">upgrade</span>
                   </button>
                 )}
-                {!member.is_owner && groupIsPrivate && (
-                  <button onClick={() => handleRemoveMember(member.member_id, member.is_anonymous ? (member.anonymous_name || 'Anonymous') : member.name)}
-                    className="btn-ghost px-3 py-1 text-xs rounded-xl text-red-400">
-                    Remove
+                {!member.is_owner && !group?.is_public && (
+                  <button 
+                    onClick={() => handleRemoveMember(member.member_id, member.is_anonymous ? (member.anonymous_name || 'Anonymous') : member.name)}
+                    className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors"
+                    title="Remove"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete</span>
                   </button>
                 )}
               </div>
             </div>
           ))}
-
           {members.length === 0 && (
             <div className="text-center py-12">
-              <div className="text-4xl mb-3">👥</div>
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>No members yet.</p>
+              <span className="material-symbols-outlined text-4xl text-[#6f787d] dark:text-[#bfc8cd] mb-2">group_off</span>
+              <p className="text-sm text-[#6f787d] dark:text-[#bfc8cd]">No members yet.</p>
             </div>
           )}
         </div>
-      </main>
-
-      {/* Add Member Modal */}
+        <div className="p-4 border-t border-gray-200 dark:border-[#004a4a] shrink-0">
+          <button 
+            onClick={() => setShowAddMember(true)} 
+            className="w-full py-3 rounded-xl bg-[#0c6780] text-white text-sm font-medium hover:opacity-90 transition-opacity dark:bg-[#87ceeb] dark:text-[#002020] flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-sm">person_add</span>
+            Add Member
+          </button>
+        </div>
+      </div>
       {showAddMember && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="glass-strong rounded-3xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden animate-scale-in">
-            <div className="flex items-center justify-between p-5 pb-3">
-              <h2 className="font-bold text-lg" style={{ color: 'var(--heading)' }}>Add Member</h2>
-              <button onClick={() => { setShowAddMember(false); setSearchQuery(''); }}
-                className="btn-ghost w-9 h-9 rounded-full flex items-center justify-center">✕</button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-60 p-4">
+          <div className="bg-white dark:bg-[#003535] rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-[#004a4a]">
+              <h2 className="font-bold text-[#002020] dark:text-[#e7fffe]">Add Member</h2>
+              <button 
+                onClick={() => { setShowAddMember(false); setSearchQuery(''); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-[#004040] transition-colors"
+              >
+                <span className="material-symbols-outlined text-[#6f787d]">close</span>
+              </button>
             </div>
-
-            <div className="px-5 pb-3">
-              <input type="text" placeholder="Search by name or roll no…" value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)} className="input-romance w-full" />
+            <div className="p-4 pb-2">
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#6f787d] text-sm">search</span>
+                <input 
+                  type="text" 
+                  placeholder="Search by name or roll number..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)} 
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-[#f5f5f5] dark:bg-[#004040] border-none text-sm text-[#002020] dark:text-[#e7fffe] focus:ring-2 focus:ring-[#87ceeb] outline-none"
+                />
+              </div>
             </div>
-
-            <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-2 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
               {filteredAvailableUsers.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-sm" style={{ color: 'var(--muted)' }}>No users available</p>
+                  <span className="material-symbols-outlined text-3xl text-[#6f787d] dark:text-[#bfc8cd] mb-1">search_off</span>
+                  <p className="text-sm text-[#6f787d] dark:text-[#bfc8cd]">No users found</p>
                 </div>
               ) : (
                 filteredAvailableUsers.map((user) => (
-                  <div key={user.user_id} className="glass rounded-2xl p-3 flex items-center gap-3">
+                  <div key={user.user_id} className="flex items-center gap-3 p-2.5 bg-[#f5f5f5] dark:bg-[#004040] rounded-xl">
                     {user.dp_url ? (
-                      <Image src={user.dp_url} alt={user.name} width={40} height={40}
-                        className="rounded-xl object-cover w-10 h-10 shrink-0" />
+                      <Image src={user.dp_url} alt={user.name} width={36} height={36}
+                        className="w-9 h-9 rounded-lg object-cover shrink-0" />
                     ) : (
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shrink-0"
-                        style={{ background: 'var(--grad-romance)' }}>
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-semibold shrink-0 bg-linear-to-br from-[#87ceeb] to-[#ffb6c1]">
                         {user.name?.charAt(0).toUpperCase() || '?'}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate" style={{ color: 'var(--heading)' }}>{user.name}</p>
-                      <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{user.roll_no} · {user.branch}</p>
+                      <p className="font-medium text-sm text-[#002020] dark:text-[#e7fffe] truncate">{user.name}</p>
+                      <p className="text-xs text-[#6f787d] dark:text-[#bfc8cd] truncate">{user.roll_no} · {user.branch}</p>
                     </div>
-                    <div className="flex gap-1.5 shrink-0">
-                      <button onClick={() => handleAddMember(user.user_id, false)} className="btn-romance px-3 py-1.5 text-xs">Add</button>
-                      <button onClick={() => handleAddMember(user.user_id, true)} className="btn-purple px-3 py-1.5 text-xs">🎭 Anon</button>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={() => handleAddMember(user.user_id, false)}
+                        className="w-9 h-9 rounded-lg bg-[#0c6780] text-white flex items-center justify-center hover:opacity-90 transition-opacity dark:bg-[#87ceeb] dark:text-[#002020]"
+                        title="Add member"
+                      >
+                        <span className="material-symbols-outlined text-sm">person_add</span>
+                      </button>
+                      <button
+                        onClick={() => handleAddMember(user.user_id, true)}
+                        className="w-9 h-9 rounded-lg bg-[#e2fffe] text-[#002020] flex items-center justify-center border border-[#87ceeb] hover:bg-[#d2f5f4] transition-colors dark:bg-[#004040] dark:text-[#e7fffe] dark:border-[#004a4a]"
+                        title="Add anonymously"
+                      >
+                        <span className="material-symbols-outlined text-sm">visibility_off</span>
+                      </button>
                     </div>
                   </div>
                 ))
@@ -299,6 +358,23 @@ export default function ManageGroupPage() {
           </div>
         </div>
       )}
+      <nav className="fixed bottom-2 left-1/2 -translate-x-1/2 flex justify-center items-center gap-1 p-1.5 z-50 rounded-full backdrop-blur-md border shadow-[0_8px_24px_rgba(0,0,0,0.12)] bg-white/90 border-[#d2f5f4] dark:bg-[#003535]/90 dark:border-[#004a4a] dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
+        <Link href="/chat" className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]" title="Chats">
+          <span className="material-symbols-outlined text-xl">chat_bubble</span>
+        </Link>
+        <Link href="/my-groups" className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]" title="Groups">
+          <span className="material-symbols-outlined text-xl">group</span>
+        </Link>
+        <Link href="/dashboard" className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]" title="Home">
+          <span className="material-symbols-outlined text-xl">home</span>
+        </Link>
+        <Link href="/my-identities" className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]" title="IDs">
+          <span className="material-symbols-outlined text-xl">badge</span>
+        </Link>
+        <Link href="/profile/edit" className="w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 text-[#6f787d] hover:scale-110 hover:text-[#0c6780] hover:bg-[#d2f5f4] dark:text-[#bfc8cd] dark:hover:bg-[#004a4a] dark:hover:text-[#87ceeb]" title="Settings">
+          <span className="material-symbols-outlined text-xl">settings</span>
+        </Link>
+      </nav>
     </div>
   );
 }

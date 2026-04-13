@@ -41,7 +41,6 @@ export interface Conversation {
   is_blocked: boolean;
 }
 
-
 export interface MessageSender {
   user_id: string;
   name: string;
@@ -49,7 +48,6 @@ export interface MessageSender {
   display_gender?: string;
   avatar_url?: string;
 }
-
 
 export interface Message {
   message_id: string;
@@ -63,6 +61,7 @@ export interface Message {
   encrypted_content: string;
   content_iv: string;
   content_auth_tag: string;
+  media_url?: string;
   user_session_key?: string;
   key_id?: string;
   parent_message_id?: string;
@@ -142,7 +141,7 @@ export interface CreatePollData {
 }
 
 export interface VoteData {
-  vote_value: boolean; // true = for/yes, false = against/no
+  vote_value: boolean;
 }
 
 export interface PollOption {

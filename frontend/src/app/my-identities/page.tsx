@@ -20,6 +20,33 @@ export default function MyAnonymousIdentities() {
   const notifRef = useRef<HTMLDivElement>(null);
   const [currentUser, setCurrentUser] = useState<{ name: string; dp_url?: string; roll_no?: string } | null>(null);
 
+  const normalizeCurrentUser = useCallback((raw: unknown) => {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const data = raw as Record<string, unknown>;
+    const name =
+      (typeof data.name === 'string' && data.name) ||
+      (typeof data.full_name === 'string' && data.full_name) ||
+      'Profile';
+    const dpUrl =
+      (typeof data.dp_url === 'string' && data.dp_url) ||
+      (typeof data.avatar_url === 'string' && data.avatar_url) ||
+      (typeof data.profile_image_url === 'string' && data.profile_image_url) ||
+      undefined;
+    const rollNo =
+      (typeof data.roll_no === 'string' && data.roll_no) ||
+      (typeof data.rollNo === 'string' && data.rollNo) ||
+      undefined;
+
+    return {
+      name,
+      dp_url: dpUrl,
+      roll_no: rollNo,
+    };
+  }, []);
+
   const [identities, setIdentities] = useState<AnonymousIdentity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<TabType>('all');
@@ -42,30 +69,44 @@ export default function MyAnonymousIdentities() {
 
   // Fetch current user profile
   const fetchCurrentUser = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    const userRaw = localStorage.getItem('user');
+    let fallbackUser: { name: string; dp_url?: string; roll_no?: string } | null = null;
+    if (userRaw) {
+      try {
+        fallbackUser = normalizeCurrentUser(JSON.parse(userRaw));
+      } catch {
+        fallbackUser = null;
+      }
+    }
+
     try {
-      const res = await fetch('/api/users/me', {
-        headers: { Authorization: `Bearer ${token}` }
+      const { API_BASE_URL } = await import('../../services/apiBase');
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = token
+        ? { Authorization: `Bearer ${token}` }
+        : {};
+
+      const res = await fetch(`${API_BASE_URL}/api/profile/me`, {
+        credentials: 'include',
+        headers,
       });
+
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.data) {
-          setCurrentUser(data.data);
+          const normalized = normalizeCurrentUser(data.data);
+          setCurrentUser(normalized || fallbackUser);
+          return;
         }
       }
     } catch {
-      const userRaw = localStorage.getItem('user');
-      if (userRaw) {
-        try {
-          const parsed = JSON.parse(userRaw);
-          setCurrentUser(parsed);
-        } catch {
-          // ignore
-        }
-      }
+      // Use fallback below.
     }
-  }, []);
+
+    if (fallbackUser) {
+      setCurrentUser(fallbackUser);
+    }
+  }, [normalizeCurrentUser]);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -78,7 +119,6 @@ export default function MyAnonymousIdentities() {
       setIsLoading(true);
       setError(null);
       const response = await getMyAnonymousIdentities();
-
       if (response.success) {
         setIdentities(response.data);
       } else {
@@ -171,7 +211,6 @@ export default function MyAnonymousIdentities() {
   // Badge counts
   const chatCount = identities.filter(i => !i.group_id).length;
   const groupCount = identities.filter(i => i.group_id).length;
-
   const tabLabels: Record<TabType, string> = { all: 'All', chat: '1V1 Chats', group: 'Groups' };
   const tabCounts: Record<TabType, number> = { all: identities.length, chat: chatCount, group: groupCount };
 

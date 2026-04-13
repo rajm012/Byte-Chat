@@ -141,8 +141,65 @@ export default function ViewProfile() {
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#002020]/40 backdrop-blur-md">
-        <div className="w-16 h-16 rounded-full border-4 border-[#87ceeb] border-t-transparent animate-spin" />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 lg:p-12 bg-black/40 backdrop-blur-md dark:bg-black/60">
+        {/* Modal Container Skeleton */}
+        <div className="relative w-full max-w-5xl h-[75vh] md:h-160 bg-surface-container-lowest dark:bg-surface-container rounded-3xl shadow-[0_40px_80px_rgba(0,32,32,0.2)] dark:shadow-[0_40px_80px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden">
+          {/* Close Button */}
+          <button className="absolute top-6 right-6 z-20 w-12 h-12 flex items-center justify-center rounded-full bg-white/80 dark:bg-[#004a4a]/80 animate-pulse">
+            <span className="material-symbols-outlined text-3xl text-transparent">close</span>
+          </button>
+
+          {/* Content Skeleton */}
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            {/* Left Column: Visual Profile Skeleton */}
+            <div className="w-full md:w-5/12 relative h-64 md:h-full bg-surface-container-low overflow-hidden">
+              <div className="w-full h-full bg-surface-container-high animate-pulse" />
+              {/* Gradient overlay skeleton */}
+              <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/40 to-transparent">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-emerald-400/30 rounded-full animate-pulse" />
+                  <div className="h-6 w-24 bg-white/30 rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Info Skeleton */}
+            <div className="w-full md:w-7/12 p-6 md:p-10 flex flex-col overflow-y-auto">
+              {/* Header */}
+              <div className="space-y-3 mb-8">
+                <div className="h-8 w-48 bg-surface-container-high rounded animate-pulse" />
+                <div className="flex items-center gap-3">
+                  <div className="h-5 w-32 bg-surface-container-high rounded animate-pulse" />
+                  <div className="h-5 w-20 bg-surface-container-high rounded animate-pulse" />
+                </div>
+              </div>
+
+              {/* Bio Section */}
+              <div className="space-y-2 mb-8">
+                <div className="h-4 w-full bg-surface-container-high rounded animate-pulse" />
+                <div className="h-4 w-5/6 bg-surface-container-high rounded animate-pulse" />
+                <div className="h-4 w-4/6 bg-surface-container-high rounded animate-pulse" />
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-3 gap-4 mb-8">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="bg-surface-container-low rounded-2xl p-4 text-center space-y-2">
+                    <div className="h-8 w-12 bg-surface-container-high rounded mx-auto animate-pulse" />
+                    <div className="h-3 w-16 bg-surface-container-high rounded mx-auto animate-pulse" />
+                  </div>
+                ))}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 mt-auto">
+                <div className="flex-1 h-12 bg-surface-container-high rounded-xl animate-pulse" />
+                <div className="flex-1 h-12 bg-surface-container-high rounded-xl animate-pulse" />
+                <div className="w-12 h-12 bg-surface-container-high rounded-xl animate-pulse" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

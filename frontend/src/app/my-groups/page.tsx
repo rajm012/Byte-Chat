@@ -11,8 +11,8 @@ import { useSocket } from '@/contexts/SocketContext';
 import { useToast } from '@/contexts/ToastContext';
 import dynamic from 'next/dynamic';
 import { Theme } from 'emoji-picker-react';
-import { encryptMessageAES, decryptMessageAES, generateAESKey, encryptKeyWithPublicKey,
-  decryptKeyWithPrivateKey, importPrivateKey, exportKeyToBase64, importKeyFromBase64 } from '@/utils/e2ee.utils';
+import { encryptMessageAES, decryptMessageAES, generateAESKey,
+  decryptKeyWithPrivateKey, importPrivateKey, importKeyFromBase64 } from '@/utils/e2ee.utils';
 
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 type EmojiData = { emoji: string };
@@ -34,10 +34,10 @@ interface GroupMessage extends Message {
   };
 }
 
-interface GroupParticipant {
-  user_id: string;
-  public_key: string;
-}
+// interface GroupParticipant {
+//   user_id: string;
+//   public_key: string;
+// }
 
 /** Small inline badge showing live online member count for a group */
 function GroupOnlineBadge({ groupId }: { groupId: string }) {
@@ -85,9 +85,9 @@ export default function MyGroupsPage() {
   const [userPrivateKey, setUserPrivateKey] = useState<CryptoKey | null>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [polls, setPolls] = useState<Poll[]>([]);
-  const [showCreatePoll, setShowCreatePoll] = useState(false);
+  const [, setShowCreatePoll] = useState(false);
   const [showPollTypeMenu, setShowPollTypeMenu] = useState(false);
-  const [selectedPollType, setSelectedPollType] = useState<string | null>(null);
+  const [, setSelectedPollType] = useState<string | null>(null);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -96,7 +96,6 @@ export default function MyGroupsPage() {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const pollMenuRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
   const currentUser = userStr ? JSON.parse(userStr) : null;
   const currentUserId = currentUser?.user_id || currentUser?.userId;
@@ -144,83 +143,6 @@ export default function MyGroupsPage() {
     return groups.filter(g => g.group_name.toLowerCase().includes(query));
   }, [searchQuery, groups]);
 
-  // Handle group selection
-  const handleSelectGroup = useCallback((group: MyGroup) => {
-    setSelectedGroup(group);
-    setShowGroupInfo(false);
-    loadGroupChat(group);
-  }, []);
-
-  // Load group chat
-  const loadGroupChat = async (group: MyGroup) => {
-    try {
-      // Load messages
-      const messagesRes = await groupService.getGroupMessages(group.group_id);
-      let fetchedMessages = messagesRes.data?.messages || [];
-
-      // Initialize E2EE
-      const aesKey = await fetchAndDecryptConversationKey(fetchedMessages, group.group_id);
-      if (aesKey) {
-        fetchedMessages = await decryptMessages(fetchedMessages, aesKey);
-      }
-      setMessages(fetchedMessages);
-
-      // Load polls
-      const pollsRes = await groupService.getGroupPolls(group.group_id);
-      setPolls(pollsRes.data?.polls || []);
-
-      // Join socket room
-      if (isConnected && group.group_id) {
-        joinGroup(group.group_id);
-      }
-    } catch (error) {
-      console.error('Failed to load group chat:', error);
-    }
-  };
-
-  // E2EE: Initialize session key
-  const fetchAndDecryptConversationKey = useCallback(async (msgs: GroupMessage[], groupId: string) => {
-    try {
-      const storedUser = localStorage.getItem('user');
-      const decryptedPrivateKeyB64 = sessionStorage.getItem('decryptedPrivateKey');
-
-      if (!decryptedPrivateKeyB64 || !storedUser) {
-        console.warn('[E2EE] Private key missing from session storage');
-        return null;
-      }
-
-      let privKey = userPrivateKey;
-      if (!privKey && decryptedPrivateKeyB64) {
-        privKey = await importPrivateKey(decryptedPrivateKeyB64);
-        setUserPrivateKey(privKey);
-      }
-
-      const msgWithKey = msgs.find(m => m.user_session_key && m.key_id);
-
-      if (msgWithKey && msgWithKey.user_session_key && msgWithKey.key_id) {
-        try {
-          const aesKeyB64 = await decryptKeyWithPrivateKey(privKey, msgWithKey.user_session_key);
-          const aesKey = await importKeyFromBase64(aesKeyB64);
-          setSessionKey(aesKey);
-          setKeyId(msgWithKey.key_id);
-          setIsE2EEReady(true);
-          return aesKey;
-        } catch (err) {
-          console.error('[E2EE] Failed to decrypt session key:', err);
-        }
-      }
-
-      // Generate new key if none exists
-      const newKey = await generateAESKey();
-      setSessionKey(newKey);
-      setIsE2EEReady(true);
-      return newKey;
-    } catch (err) {
-      console.error('[E2EE] Key initialization failed:', err);
-      return null;
-    }
-  }, [userPrivateKey]);
-
   const decryptMessages = useCallback(async (msgs: GroupMessage[], aesKey: CryptoKey) => {
     return await Promise.all(msgs.map(async (m) => {
       const decryptedMsg = { ...m };
@@ -242,6 +164,78 @@ export default function MyGroupsPage() {
     }));
   }, []);
 
+  const fetchAndDecryptConversationKey = useCallback(async (msgs: GroupMessage[]) => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      const decryptedPrivateKeyB64 = sessionStorage.getItem('decryptedPrivateKey');
+
+      if (!decryptedPrivateKeyB64 || !storedUser) {
+        console.warn('[E2EE] Private key missing from session storage');
+        return null;
+      }
+
+      let privKey = userPrivateKey;
+      if (!privKey && decryptedPrivateKeyB64) {
+        privKey = await importPrivateKey(decryptedPrivateKeyB64);
+        setUserPrivateKey(privKey);
+      }
+
+      const msgWithKey = msgs.find(m => m.user_session_key && m.key_id);
+
+      if (msgWithKey && msgWithKey.user_session_key && msgWithKey.key_id && privKey) {
+        try {
+          const aesKeyB64 = await decryptKeyWithPrivateKey(privKey as CryptoKey, msgWithKey.user_session_key);
+          const aesKey = await importKeyFromBase64(aesKeyB64);
+          setSessionKey(aesKey);
+          setKeyId(msgWithKey.key_id);
+          setIsE2EEReady(true);
+          return aesKey;
+        } catch (err) {
+          console.error('[E2EE] Failed to decrypt session key:', err);
+        }
+      }
+
+      // Generate new key if none exists
+      const newKey = await generateAESKey();
+      setSessionKey(newKey);
+      setIsE2EEReady(true);
+      return newKey;
+    } catch (err) {
+      console.error('[E2EE] Key initialization failed:', err);
+      return null;
+    }
+  }, [userPrivateKey]);
+
+  const loadGroupChat = useCallback(async (group: MyGroup) => {
+    try {
+      const messagesRes = await groupService.getGroupMessages(group.group_id);
+      let fetchedMessages = messagesRes.data?.messages || [];
+      const aesKey = await fetchAndDecryptConversationKey(fetchedMessages);
+      if (aesKey) {
+        fetchedMessages = await decryptMessages(fetchedMessages, aesKey);
+      }
+      setMessages(fetchedMessages);
+
+      // Load polls
+      const pollsRes = await groupService.getGroupPolls(group.group_id);
+      setPolls(pollsRes.data?.polls || []);
+
+      // Join socket room
+      if (isConnected && group.group_id) {
+        joinGroup(group.group_id);
+      }
+    } catch (error) {
+      console.error('Failed to load group chat:', error);
+    }
+  },
+  [fetchAndDecryptConversationKey, decryptMessages, setMessages, setPolls, isConnected, joinGroup]);
+
+  const handleSelectGroup = useCallback((group: MyGroup) => {
+    setSelectedGroup(group);
+    setShowGroupInfo(false);
+    loadGroupChat(group);
+  }, [loadGroupChat]);
+
   // Socket event listeners
   useEffect(() => {
     if (!isConnected || !socket || !selectedGroup) return;
@@ -251,7 +245,6 @@ export default function MyGroupsPage() {
         setMessages(prev => [...prev, data.message]);
       }
     };
-
     const handleTyping = (data: { userId: string; groupId: string; isTyping: boolean }) => {
       if (data.groupId === selectedGroup?.group_id && data.userId !== currentUserId) {
         if (data.isTyping) {
@@ -264,7 +257,6 @@ export default function MyGroupsPage() {
 
     socket.on('group:message', handleNewMessage);
     socket.on('group:typing', handleTyping);
-
     return () => {
       socket.off('group:message', handleNewMessage);
       socket.off('group:typing', handleTyping);
@@ -283,10 +275,10 @@ export default function MyGroupsPage() {
   const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewMessage(e.target.value);
     if (selectedGroup && isConnected) {
-      sendTyping(selectedGroup.group_id, true);
+      sendTyping(selectedGroup.group_id, 'group', true);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
-        sendTyping(selectedGroup.group_id, false);
+        sendTyping(selectedGroup.group_id, 'group', false);
       }, 2000);
     }
   };
@@ -353,7 +345,7 @@ export default function MyGroupsPage() {
 
       if (isE2EEReady && sessionKey) {
         try {
-          const { ciphertext, iv, authTag } = await encryptMessageAES(finalContent, sessionKey);
+          const { ciphertext, iv, authTag } = await encryptMessageAES(finalContent, sessionKey as CryptoKey);
           finalContent = ciphertext;
           contentIv = iv;
           contentAuthTag = authTag;
@@ -365,7 +357,7 @@ export default function MyGroupsPage() {
       }
 
       // Send message
-      await groupService.sendMessage(selectedGroup.group_id, {
+      await groupService.sendGroupMessage(selectedGroup.group_id, {
         encryptedContent: finalContent,
         contentIv,
         contentAuthTag,
@@ -410,7 +402,6 @@ export default function MyGroupsPage() {
     const now = new Date();
     const diff = now.getTime() - d.getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
-
     if (hours < 1) return 'Just now';
     if (hours < 24) return `${hours}h ago`;
     if (hours < 48) return 'Yesterday';
@@ -419,11 +410,68 @@ export default function MyGroupsPage() {
 
   if (loading) {
     return (
-      <div className={`min-h-screen bg-[#e2fffe] flex items-center justify-center ${isDarkMode ? 'dark' : ''}`}>
-        <div className="dark:bg-[#002020] dark:text-[#87ceeb] min-h-screen w-full flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-14 h-14 rounded-full border-4 border-[#87ceeb] dark:border-[#0c6780] border-t-transparent mx-auto mb-4 animate-spin" />
-            <p className="text-sm text-[#0c6780] dark:text-[#87ceeb]">Loading groups…</p>
+      <div className={`min-h-screen bg-[#e2fffe] font-sans text-[#002020] ${isDarkMode ? 'dark' : ''}`}>
+        <div className="dark:bg-[#002020] dark:text-[#e7fffe] min-h-screen">
+          <div className="fixed inset-0 bg-[#002020]/20 dark:bg-black/40 backdrop-blur-md z-40 flex items-center justify-center p-4">
+            <div className="w-full h-full md:w-[95%] md:h-[95%] bg-white/80 dark:bg-[#003535]/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,32,32,0.06)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative overflow-hidden flex flex-col md:flex-row border border-white/50 dark:border-[#004a4a]/50">
+              {/* Sidebar with skeleton */}
+              <aside className="w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative">
+                <div className="p-6">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-6">
+                    <h1 className="text-2xl font-extrabold tracking-tight text-[#0c6780] dark:text-[#87ceeb]">Groups</h1>
+                    <div className="w-10 h-10 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
+                  </div>
+
+                  {/* Search placeholder */}
+                  <div className="relative mb-4">
+                    <div className="w-full bg-white dark:bg-[#004040] rounded-full py-2.5 pl-10 pr-4 h-10 animate-pulse" />
+                  </div>
+
+                  {/* Create button placeholder */}
+                  <div className="w-full py-3 px-4 rounded-xl h-11 bg-gradient-to-r from-[#87ceeb]/30 to-[#ffb6c1]/30 dark:from-[#0c6780]/30 dark:to-[#4a6368]/30 animate-pulse" />
+                </div>
+
+                {/* Group list skeleton */}
+                <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl animate-pulse">
+                      <div className="w-12 h-12 rounded-xl bg-[#87ceeb]/20 dark:bg-[#0c6780]/20" />
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="h-3.5 w-3/4 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded" />
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-20 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded" />
+                          <div className="h-3 w-16 bg-[#22C55E]/20 rounded" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </aside>
+
+              {/* Main area with skeleton */}
+              <main className="hidden md:flex flex-1 flex-col bg-white/50 dark:bg-[#003535]/30 min-h-0">
+                {/* Header skeleton */}
+                <div className="px-6 py-4 bg-white/30 dark:bg-[#003535]/30 backdrop-blur-md border-b border-white/30 dark:border-[#004a4a]/30 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
+                    <div className="space-y-1">
+                      <div className="h-4 w-32 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded animate-pulse" />
+                      <div className="h-3 w-24 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Empty state placeholder */}
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 mx-auto animate-pulse" />
+                    <div className="h-4 w-40 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 mx-auto rounded animate-pulse" />
+                    <div className="h-3 w-32 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 mx-auto rounded animate-pulse" />
+                  </div>
+                </div>
+              </main>
+            </div>
           </div>
         </div>
       </div>
@@ -433,18 +481,13 @@ export default function MyGroupsPage() {
   return (
     <div className={`min-h-screen bg-[#e2fffe] font-sans text-[#002020] ${isDarkMode ? 'dark' : ''}`}>
       <div className="dark:bg-[#002020] dark:text-[#e7fffe] min-h-screen">
-        {/* Background blur overlay */}
         <div className="fixed inset-0 bg-[#002020]/20 dark:bg-black/40 backdrop-blur-md z-40 flex items-center justify-center p-4">
-          {/* Groups Modal Container */}
           <div className="w-full h-full md:w-[95%] md:h-[95%] bg-white/80 dark:bg-[#003535]/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,32,32,0.06)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative overflow-hidden flex flex-col md:flex-row border border-white/50 dark:border-[#004a4a]/50">
-            {/* Left Panel: Group List (35%) */}
             <aside className="w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative">
-              {/* Header */}
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h1 className="text-2xl font-extrabold tracking-tight text-[#0c6780] dark:text-[#87ceeb] font-['Plus_Jakarta_Sans']">Groups</h1>
                   <div className="flex items-center gap-2">
-                    {/* Theme Toggle */}
                     <button
                       onClick={toggleTheme}
                       className="w-10 h-10 flex items-center justify-center hover:bg-[#87ceeb]/20 dark:hover:bg-[#0c6780]/30 rounded-full transition-colors group"
@@ -454,7 +497,6 @@ export default function MyGroupsPage() {
                         {isDarkMode ? 'light_mode' : 'dark_mode'}
                       </span>
                     </button>
-                    {/* Close */}
                     <Link
                       href="/dashboard"
                       className="w-10 h-10 flex items-center justify-center hover:bg-red-100/50 dark:hover:bg-red-900/30 rounded-full transition-colors group"
@@ -477,7 +519,6 @@ export default function MyGroupsPage() {
                   />
                 </div>
 
-                {/* Create Group Button */}
                 <Link
                   href="/dashboard"
                   className="w-full py-3 px-4 rounded-xl bg-linear-to-r from-[#87ceeb] to-[#ffb6c1] dark:from-[#0c6780] dark:to-[#4a6368] text-white font-semibold text-sm flex items-center justify-center gap-2 hover:shadow-lg transition-all"
@@ -487,7 +528,6 @@ export default function MyGroupsPage() {
                 </Link>
               </div>
 
-              {/* Group List */}
               <div className="flex-1 overflow-y-auto px-4 pb-4">
                 {error && (
                   <div className="p-4 mb-4 rounded-xl bg-red-100/50 border border-red-400 text-red-700 text-sm">
@@ -553,13 +593,10 @@ export default function MyGroupsPage() {
               </div>
             </aside>
 
-            {/* Right Panel: Group Chat or Group Info or Empty State */}
             <main className="flex-1 flex flex-col bg-white/50 dark:bg-[#003535]/30 min-h-0">
               {showGroupInfo && selectedGroup ? (
-                // Group Info View
                 <div className="flex-1 overflow-y-auto p-6">
                   <div className="max-w-2xl mx-auto">
-                    {/* Back Button */}
                     <button
                       onClick={() => setShowGroupInfo(false)}
                       className="mb-4 flex items-center gap-2 text-[#6f787d] dark:text-[#bfc8cd] hover:text-[#0c6780] dark:hover:text-[#87ceeb] transition-colors"
@@ -610,13 +647,13 @@ export default function MyGroupsPage() {
                         <span className="material-symbols-outlined text-2xl text-[#0c6780] dark:text-[#87ceeb] mb-2">info</span>
                         <p className="text-sm font-medium text-[#002020] dark:text-[#e7fffe]">Full Details</p>
                       </Link>
-                      <button
-                        onClick={() => router.push(`/groups/${selectedGroup.group_id}/members`)}
+                      <Link
+                        href={`/groups/${selectedGroup.group_id}`}
                         className="p-4 rounded-xl bg-white dark:bg-[#004040] shadow-sm hover:shadow-md transition-shadow text-center"
                       >
                         <span className="material-symbols-outlined text-2xl text-[#0c6780] dark:text-[#87ceeb] mb-2">group</span>
                         <p className="text-sm font-medium text-[#002020] dark:text-[#e7fffe]">Members</p>
-                      </button>
+                      </Link>
                     </div>
 
                     {/* Polls Section */}
@@ -717,7 +754,7 @@ export default function MyGroupsPage() {
                                 </a>
                               </div>
                             )}
-                            {msg.encrypted_content && msg.encrypted_content !== 'Image' && (
+                            {msg.encrypted_content && msg.message_type !== 'image' && (
                               <p className="text-sm whitespace-pre-wrap">{msg.encrypted_content}</p>
                             )}
                             <div className={`flex items-center gap-1 mt-1 ${msg.is_my_message ? 'justify-end' : 'justify-start'}`}>
@@ -788,7 +825,7 @@ export default function MyGroupsPage() {
 
                   {/* Emoji Picker */}
                   {showEmojiPicker && (
-                    <div ref={emojiPickerRef} className="absolute bottom-20 left-4 z-50">
+                    <div ref={emojiPickerRef} className="absolute bottom-20 right-4 z-50">
                       <div className="shadow-2xl rounded-2xl overflow-hidden border border-white/20">
                         <EmojiPicker
                           onEmojiClick={handleEmojiSelect}
@@ -801,7 +838,7 @@ export default function MyGroupsPage() {
 
                   {/* Poll Menu */}
                   {showPollTypeMenu && (
-                    <div ref={pollMenuRef} className="absolute bottom-20 left-4 bg-white/90 dark:bg-[#004040]/90 backdrop-blur-xl rounded-2xl p-3 w-52 shadow-xl border border-white/30 dark:border-[#004a4a]/30 z-50">
+                    <div ref={pollMenuRef} className="absolute bottom-20 right-4 bg-white/90 dark:bg-[#004040]/90 backdrop-blur-xl rounded-2xl p-3 w-52 shadow-xl border border-white/30 dark:border-[#004a4a]/30 z-50">
                       <p className="text-[10px] font-bold px-2 py-1 text-[#6f787d] dark:text-[#bfc8cd] uppercase tracking-widest">Create Poll</p>
                       {[
                         { value: 'kick_member', label: '🚫 Kick Member', desc: 'Vote to remove someone' },

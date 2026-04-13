@@ -308,11 +308,90 @@ export default function ProfileEditPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface text-on-surface overflow-hidden flex items-center justify-center">
-        <div className="text-center animate-fade-in">
-          <div className="w-16 h-16 rounded-full border-4 border-outline-variant mx-auto mb-4 animate-spin"
-            style={{ borderTopColor: 'var(--primary)' }} />
-          <p className="text-sm font-medium text-on-surface-variant">Loading profile…</p>
+      <div className="min-h-screen bg-surface text-on-surface overflow-hidden">
+        {/* TopNavBar Skeleton */}
+        <nav className="flex justify-between items-center px-8 h-16 w-full fixed top-0 z-40 glass-nav">
+          <div className="flex items-center gap-8">
+            <div className="h-8 w-40 bg-surface-container-high rounded animate-pulse" />
+            <div className="hidden md:flex gap-6">
+              <div className="h-4 w-16 bg-surface-container-high rounded animate-pulse" />
+              <div className="h-4 w-16 bg-surface-container-high rounded animate-pulse" />
+              <div className="h-4 w-20 bg-surface-container-high rounded animate-pulse" />
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-48 bg-surface-container-high rounded-full animate-pulse" />
+            <div className="w-10 h-10 rounded-full bg-surface-container-high animate-pulse" />
+            <div className="w-10 h-10 rounded-full bg-surface-container-high animate-pulse" />
+          </div>
+        </nav>
+
+        {/* Main Content Background */}
+        <main className="pt-24 pb-32 px-8 grid grid-cols-12 gap-8 opacity-40 blur-sm pointer-events-none">
+          <div className="col-span-8 flex flex-col gap-12">
+            <div className="h-64 signature-gradient rounded-lg w-full flex items-end p-8">
+              <div className="h-12 w-48 bg-white/30 rounded animate-pulse" />
+            </div>
+            <div className="grid grid-cols-2 gap-8">
+              <div className="bg-white p-8 rounded-lg h-80" />
+              <div className="bg-white p-8 rounded-lg h-80" />
+            </div>
+          </div>
+          <div className="col-span-4 flex flex-col gap-8">
+            <div className="bg-surface-container p-6 rounded-lg h-96" />
+            <div className="bg-surface-container p-6 rounded-lg h-48" />
+          </div>
+        </main>
+
+        {/* Modal Overlay Skeleton */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-background/10 dark:bg-on-background/30 backdrop-blur-md">
+          <div className="w-[85%] h-[85%] bg-surface rounded-lg shadow-[0px_20px_60px_rgba(0,32,32,0.1)] flex overflow-hidden">
+            {/* SideNavBar Skeleton */}
+            <aside className="flex flex-col w-72 h-full py-8 px-4 bg-surface-container-low/80 backdrop-blur-xl border-r border-outline-variant/15">
+              <div className="px-4 mb-10 space-y-2">
+                <div className="h-8 w-24 bg-surface-container-high rounded animate-pulse" />
+                <div className="h-4 w-32 bg-surface-container-high rounded animate-pulse" />
+              </div>
+              <nav className="flex flex-col gap-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 px-4 py-4">
+                    <div className="w-5 h-5 rounded bg-surface-container-high animate-pulse" />
+                    <div className="h-4 w-24 bg-surface-container-high rounded animate-pulse" />
+                  </div>
+                ))}
+              </nav>
+              <div className="mt-auto px-4">
+                <div className="flex items-center justify-center gap-3 py-3">
+                  <div className="w-10 h-10 rounded-full bg-surface-container-high animate-pulse" />
+                  <div className="w-10 h-10 rounded-full bg-surface-container-high animate-pulse" />
+                </div>
+              </div>
+            </aside>
+
+            {/* Right Content Area Skeleton */}
+            <div className="flex-1 overflow-y-auto bg-surface-container-lowest p-12">
+              {/* Profile Header Card Skeleton */}
+              <div className="relative bg-surface-container-low rounded-lg p-8 mb-12 flex flex-col md:flex-row items-center gap-10">
+                <div className="w-32 h-32 rounded-full border-4 border-surface-container shadow-lg bg-surface-container-high animate-pulse" />
+                <div className="flex-1 space-y-4 w-full">
+                  <div className="h-8 w-48 bg-surface-container-high rounded animate-pulse" />
+                  <div className="h-4 w-32 bg-surface-container-high rounded animate-pulse" />
+                  <div className="h-10 w-full bg-surface-container-high rounded-lg animate-pulse" />
+                </div>
+              </div>
+
+              {/* Form Skeleton */}
+              <div className="space-y-6">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="h-4 w-24 bg-surface-container-high rounded animate-pulse" />
+                    <div className="h-12 w-full bg-surface-container-high rounded-lg animate-pulse" />
+                  </div>
+                ))}
+                <div className="h-12 w-32 bg-surface-container-high rounded-xl animate-pulse mt-8" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

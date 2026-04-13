@@ -102,33 +102,72 @@ export default function DashboardPage() {
   const [navigating, setNavigating] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name: string; dp_url?: string; roll_no?: string } | null>(null);
 
+  const normalizeCurrentUser = useCallback((raw: unknown) => {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const data = raw as Record<string, unknown>;
+    const name =
+      (typeof data.name === 'string' && data.name) ||
+      (typeof data.full_name === 'string' && data.full_name) ||
+      'Profile';
+    const dpUrl =
+      (typeof data.dp_url === 'string' && data.dp_url) ||
+      (typeof data.avatar_url === 'string' && data.avatar_url) ||
+      (typeof data.profile_image_url === 'string' && data.profile_image_url) ||
+      undefined;
+    const rollNo =
+      (typeof data.roll_no === 'string' && data.roll_no) ||
+      (typeof data.rollNo === 'string' && data.rollNo) ||
+      undefined;
+
+    return {
+      name,
+      dp_url: dpUrl,
+      roll_no: rollNo,
+    };
+  }, []);
+
   // Fetch current user profile with dp_url from API
   const fetchCurrentUser = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    const userRaw = localStorage.getItem('user');
+    let fallbackUser: { name: string; dp_url?: string; roll_no?: string } | null = null;
+    if (userRaw) {
+      try {
+        fallbackUser = normalizeCurrentUser(JSON.parse(userRaw));
+      } catch {
+        fallbackUser = null;
+      }
+    }
+
     try {
-      const res = await fetch('/api/users/me', {
-        headers: { Authorization: `Bearer ${token}` }
+      const { API_BASE_URL } = await import('../../services/apiBase');
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = token
+        ? { Authorization: `Bearer ${token}` }
+        : {};
+      const res = await fetch(`${API_BASE_URL}/api/profile/me`, {
+        credentials: 'include',
+        headers,
       });
+
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.data) {
-          setCurrentUser(data.data);
+          const normalized = normalizeCurrentUser(data.data);
+          setCurrentUser(normalized || fallbackUser);
+          return;
         }
       }
     } catch {
-      // fallback to localStorage
-      const userRaw = localStorage.getItem('user');
-      if (userRaw) {
-        try {
-          const parsed = JSON.parse(userRaw);
-          setCurrentUser(parsed);
-        } catch {
-          // ignore
-        }
-      }
+      // Use fallback below.
     }
-  }, []);
+
+    if (fallbackUser) {
+      setCurrentUser(fallbackUser);
+    }
+  }, [normalizeCurrentUser]);
 
   useEffect(() => {
     setMounted(true);
@@ -253,11 +292,115 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-mesh-warm flex items-center justify-center">
-        <div className="text-center animate-fade-in">
-          <div className="w-16 h-16 rounded-full border-4 border-t-transparent mx-auto mb-4 animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
-          <p className="text-sm font-medium text-on-surface-variant">Loading campus…</p>
+      <div className="min-h-screen bg-mesh-warm antialiased pb-28">
+        {/* Fixed blobs - keep for visual consistency */}
+        <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+          <div className="absolute top-[-10%] right-[-5%] w-125 h-125 bg-linear-to-br from-primary-container/15 to-transparent rounded-full blur-3xl" />
+          <div className="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-linear-to-br from-tertiary-container/10 to-transparent rounded-full blur-3xl" />
         </div>
+
+        {/* Header - keep navigation visible */}
+        <header className="glass-nav fixed top-0 w-full z-50 shadow-[0_20px_40px_rgba(0,32,32,0.06)]">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+            {/* Logo */}
+            <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-primary">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <span className="text-xl font-black text-on-surface tracking-tight">
+                Byte<span className="text-primary">chat</span>
+              </span>
+            </Link>
+
+            {/* Search Bar Center - disabled */}
+            <div className="hidden md:flex flex-1 max-w-md mx-8">
+              <div className="relative w-full">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+                <input
+                  type="text"
+                  placeholder="Search batchmates..."
+                  disabled
+                  className="w-full pl-10 pr-4 py-2 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-primary text-sm text-on-surface opacity-50 cursor-not-allowed"
+                />
+              </div>
+            </div>
+
+            {/* Right Actions - skeleton */}
+            <div className="flex items-center gap-2">
+              <div className="h-10 w-10 rounded-full bg-surface-container-high animate-pulse" />
+            </div>
+          </div>
+        </header>
+
+        {/* Skeleton Content */}
+        <main className="max-w-7xl mx-auto px-5 sm:px-8 pt-24 pb-12">
+          {/* Header Skeleton */}
+          <div className="mb-12">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="space-y-2">
+                <div className="h-3 w-24 bg-surface-container-high rounded animate-pulse" />
+                <div className="flex items-center gap-2">
+                  <div className="h-10 w-48 bg-surface-container-high rounded animate-pulse" />
+                  <div className="h-10 w-32 bg-surface-container-high rounded animate-pulse" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="h-10 w-24 bg-surface-container-high rounded-full animate-pulse" />
+                <div className="h-10 w-24 bg-surface-container-high rounded-full animate-pulse" />
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Search */}
+          <div className="md:hidden mb-6">
+            <div className="h-10 w-full bg-surface-container-high rounded-full animate-pulse" />
+          </div>
+
+          {/* Skeleton Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {Array.from({ length: 12 }).map((_, index) => (
+              <div
+                key={index}
+                className={`group relative flex flex-col bg-surface-container-lowest rounded-lg overflow-hidden ${index % 3 === 1 ? 'md:mt-6' : ''}`}
+              >
+                {/* Image area */}
+                <div className="aspect-square bg-surface-container-high animate-pulse" />
+                {/* Info area */}
+                <div className="p-2.5 flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="h-3.5 w-3/4 bg-surface-container-high rounded animate-pulse" />
+                      <div className="h-2.5 w-1/2 bg-surface-container-high rounded animate-pulse" />
+                    </div>
+                    <div className="h-5 w-10 bg-surface-container-high rounded shrink-0 animate-pulse" />
+                  </div>
+                  <div className="flex gap-1.5">
+                    <div className="h-6 flex-1 bg-surface-container-high rounded animate-pulse" />
+                    <div className="h-6 flex-1 bg-surface-container-high rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+
+        {/* Floating Bottom Dock - keep visible */}
+        <nav className="fixed bottom-2 left-1/2 -translate-x-1/2 flex justify-center items-center gap-1 p-1.5 z-50 bg-surface-container-high/90 dark:bg-surface-container/90 rounded-full backdrop-blur-md border border-outline-variant/30 shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
+          <Link href="/chat" className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300">
+            <span className="material-symbols-outlined text-xl">chat_bubble</span>
+          </Link>
+          <Link href="/my-groups" className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300">
+            <span className="material-symbols-outlined text-xl">group</span>
+          </Link>
+          <Link href="/dashboard" className="w-14 h-14 flex items-center justify-center text-white rounded-full bg-primary hover:scale-110 transition-all duration-300 shadow-lg">
+            <span className="material-symbols-outlined text-2xl">home</span>
+          </Link>
+          <Link href="/profile/edit" className="w-12 h-12 flex items-center justify-center text-on-surface-variant rounded-full hover:scale-110 hover:text-primary hover:bg-surface-container-high transition-all duration-300">
+            <span className="material-symbols-outlined text-xl">person</span>
+          </Link>
+        </nav>
       </div>
     );
   }
@@ -303,7 +446,7 @@ export default function DashboardPage() {
               <input
                 type="text"
                 placeholder={activeTab === 'users' ? 'Search batchmates...' : 'Search groups...'}
-                value={searchQuery}
+                value={searchQuery || ''}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-primary text-sm text-on-surface"
               />
@@ -477,7 +620,7 @@ export default function DashboardPage() {
             <input
               type="text"
               placeholder={activeTab === 'users' ? 'Search batchmates...' : 'Search groups...'}
-              value={searchQuery}
+              value={searchQuery || ''}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-primary text-sm text-on-surface"
             />
