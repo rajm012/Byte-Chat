@@ -344,23 +344,23 @@ export default function ProfileEditPage() {
         </main>
 
         {/* Modal Overlay Skeleton */}
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-background/10 dark:bg-on-background/30 backdrop-blur-md">
-          <div className="w-[85%] h-[85%] bg-surface rounded-lg shadow-[0px_20px_60px_rgba(0,32,32,0.1)] flex overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-background/10 dark:bg-on-background/30 backdrop-blur-md p-2 sm:p-4 md:p-6">
+          <div className="w-full h-full md:w-[90%] md:h-[90%] lg:w-[85%] lg:h-[85%] bg-surface rounded-lg shadow-[0px_20px_60px_rgba(0,32,32,0.1)] flex flex-col md:flex-row overflow-hidden">
             {/* SideNavBar Skeleton */}
-            <aside className="flex flex-col w-72 h-full py-8 px-4 bg-surface-container-low/80 backdrop-blur-xl border-r border-outline-variant/15">
-              <div className="px-4 mb-10 space-y-2">
-                <div className="h-8 w-24 bg-surface-container-high rounded animate-pulse" />
-                <div className="h-4 w-32 bg-surface-container-high rounded animate-pulse" />
+            <aside className="flex flex-col w-full md:w-64 lg:w-72 md:h-full py-4 md:py-8 px-3 md:px-4 bg-surface-container-low/80 backdrop-blur-xl border-b md:border-b-0 md:border-r border-outline-variant/15 shrink-0">
+              <div className="px-2 md:px-4 mb-4 md:mb-10 space-y-2">
+                <div className="h-6 md:h-8 w-24 bg-surface-container-high rounded animate-pulse" />
+                <div className="h-3 md:h-4 w-32 bg-surface-container-high rounded animate-pulse" />
               </div>
-              <nav className="flex flex-col gap-2">
+              <nav className="flex flex-row md:flex-col gap-1 md:gap-2 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 px-4 py-4">
+                  <div key={i} className="flex items-center gap-2 md:gap-4 px-3 md:px-4 py-2 md:py-4 shrink-0">
                     <div className="w-5 h-5 rounded bg-surface-container-high animate-pulse" />
-                    <div className="h-4 w-24 bg-surface-container-high rounded animate-pulse" />
+                    <div className="h-4 w-16 md:w-24 bg-surface-container-high rounded animate-pulse" />
                   </div>
                 ))}
               </nav>
-              <div className="mt-auto px-4">
+              <div className="hidden md:block mt-auto px-4">
                 <div className="flex items-center justify-center gap-3 py-3">
                   <div className="w-10 h-10 rounded-full bg-surface-container-high animate-pulse" />
                   <div className="w-10 h-10 rounded-full bg-surface-container-high animate-pulse" />
@@ -369,10 +369,10 @@ export default function ProfileEditPage() {
             </aside>
 
             {/* Right Content Area Skeleton */}
-            <div className="flex-1 overflow-y-auto bg-surface-container-lowest p-12">
+            <div className="flex-1 overflow-y-auto bg-surface-container-lowest p-4 sm:p-6 md:p-8 lg:p-12 pb-24 md:pb-28">
               {/* Profile Header Card Skeleton */}
-              <div className="relative bg-surface-container-low rounded-lg p-8 mb-12 flex flex-col md:flex-row items-center gap-10">
-                <div className="w-32 h-32 rounded-full border-4 border-surface-container shadow-lg bg-surface-container-high animate-pulse" />
+              <div className="relative bg-surface-container-low rounded-lg p-4 sm:p-6 md:p-8 mb-6 md:mb-12 flex flex-col md:flex-row items-center gap-4 md:gap-10">
+                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-surface-container shadow-lg bg-surface-container-high animate-pulse shrink-0" />
                 <div className="flex-1 space-y-4 w-full">
                   <div className="h-8 w-48 bg-surface-container-high rounded animate-pulse" />
                   <div className="h-4 w-32 bg-surface-container-high rounded animate-pulse" />
@@ -470,72 +470,75 @@ export default function ProfileEditPage() {
       </main>
 
       {/* Modal Overlay */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-background/10 dark:bg-on-background/30 backdrop-blur-md">
-        <div className="w-[85%] h-[85%] bg-surface rounded-lg shadow-[0px_20px_60px_rgba(0,32,32,0.1)] flex overflow-hidden">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-background/10 dark:bg-on-background/30 backdrop-blur-md p-2 sm:p-4 md:p-6">
+        <div className="w-full h-full md:w-[90%] md:h-[90%] lg:w-[85%] lg:h-[85%] bg-surface rounded-lg shadow-[0px_20px_60px_rgba(0,32,32,0.1)] flex flex-col md:flex-row overflow-hidden">
           {/* SideNavBar */}
-            <aside className="flex flex-col w-72 h-full py-8 px-4 bg-surface-container-low/80 backdrop-blur-xl border-r border-outline-variant/15">
-            <div className="px-4 mb-10">
-              <h2 className="text-2xl font-extrabold text-primary">Settings</h2>
-              <p className="text-sm font-medium text-on-surface-variant">Student Account</p>
+            <aside className="flex flex-col w-full md:w-64 lg:w-72 md:h-full py-4 md:py-8 px-3 md:px-4 bg-surface-container-low/80 backdrop-blur-xl border-b md:border-b-0 md:border-r border-outline-variant/15 shrink-0">
+            <div className="px-2 md:px-4 mb-4 md:mb-10">
+              <h2 className="text-xl md:text-2xl font-extrabold text-primary">Settings</h2>
+              <p className="text-xs md:text-sm font-medium text-on-surface-variant">Student Account</p>
             </div>
-            <nav className="flex flex-col gap-2">
+            <nav className="flex flex-row md:flex-col gap-1 md:gap-2 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
               <button
                 onClick={() => setActiveTab('personal')}
-                className={`flex items-center gap-4 px-4 py-4 transition-all duration-300 text-xs font-semibold ${
+                className={`flex items-center gap-2 md:gap-4 px-3 md:px-4 py-2 md:py-4 transition-all duration-300 text-xs font-semibold whitespace-nowrap ${
                   activeTab === 'personal'
-                    ? 'text-on-surface font-bold border-r-4 border-primary bg-primary-container/20'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/50 rounded-r-lg group'
+                    ? 'text-on-surface font-bold border-b-2 md:border-b-0 md:border-r-4 border-primary bg-primary-container/20 rounded-t-lg md:rounded-t-none md:rounded-r-lg'
+                    : 'text-on-surface-variant hover:bg-surface-container-high/50 rounded-lg md:rounded-r-lg group'
                 }`}
               >
                 <span className="material-symbols-outlined text-sm">person</span>
-                <span>Profile Info</span>
+                <span className="hidden sm:inline">Profile Info</span>
+                <span className="sm:hidden">Profile</span>
               </button>
               <button
                 onClick={() => setActiveTab('settings')}
-                className={`flex items-center gap-4 px-4 py-4 transition-all duration-300 text-xs font-semibold ${
+                className={`flex items-center gap-2 md:gap-4 px-3 md:px-4 py-2 md:py-4 transition-all duration-300 text-xs font-semibold whitespace-nowrap ${
                   activeTab === 'settings'
-                    ? 'text-on-surface font-bold border-r-4 border-primary bg-primary-container/20'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/50 rounded-r-lg group'
+                    ? 'text-on-surface font-bold border-b-2 md:border-b-0 md:border-r-4 border-primary bg-primary-container/20 rounded-t-lg md:rounded-t-none md:rounded-r-lg'
+                    : 'text-on-surface-variant hover:bg-surface-container-high/50 rounded-lg md:rounded-r-lg group'
                 }`}
               >
                 <span className="material-symbols-outlined text-sm">edit</span>
-                <span>Edit Profile</span>
+                <span>Edit</span>
               </button>
               <button
                 onClick={() => setActiveTab('privacy')}
-                className={`flex items-center gap-4 px-4 py-4 transition-all duration-300 text-xs font-semibold ${
+                className={`flex items-center gap-2 md:gap-4 px-3 md:px-4 py-2 md:py-4 transition-all duration-300 text-xs font-semibold whitespace-nowrap ${
                   activeTab === 'privacy'
-                    ? 'text-on-surface font-bold border-r-4 border-primary bg-primary-container/20'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/50 rounded-r-lg group'
+                    ? 'text-on-surface font-bold border-b-2 md:border-b-0 md:border-r-4 border-primary bg-primary-container/20 rounded-t-lg md:rounded-t-none md:rounded-r-lg'
+                    : 'text-on-surface-variant hover:bg-surface-container-high/50 rounded-lg md:rounded-r-lg group'
                 }`}
               >
                 <span className="material-symbols-outlined text-sm">notifications</span>
-                <span>Notifications</span>
+                <span className="hidden sm:inline">Notifications</span>
+                <span className="sm:hidden">Alerts</span>
               </button>
               <button
                 onClick={() => setActiveTab('blocks')}
-                className={`flex items-center gap-4 px-4 py-4 transition-all duration-300 text-xs font-semibold ${
+                className={`flex items-center gap-2 md:gap-4 px-3 md:px-4 py-2 md:py-4 transition-all duration-300 text-xs font-semibold whitespace-nowrap ${
                   activeTab === 'blocks'
-                    ? 'text-on-surface font-bold border-r-4 border-primary bg-primary-container/20'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/50 rounded-r-lg group'
+                    ? 'text-on-surface font-bold border-b-2 md:border-b-0 md:border-r-4 border-primary bg-primary-container/20 rounded-t-lg md:rounded-t-none md:rounded-r-lg'
+                    : 'text-on-surface-variant hover:bg-surface-container-high/50 rounded-lg md:rounded-r-lg group'
                 }`}
               >
                 <span className="material-symbols-outlined text-sm">block</span>
-                <span>Blocked IDs</span>
+                <span className="hidden sm:inline">Blocked IDs</span>
+                <span className="sm:hidden">Blocked</span>
               </button>
               <button
                 onClick={() => setActiveTab('security')}
-                className={`flex items-center gap-4 px-4 py-4 transition-all duration-300 text-xs font-semibold ${
+                className={`flex items-center gap-2 md:gap-4 px-3 md:px-4 py-2 md:py-4 transition-all duration-300 text-xs font-semibold whitespace-nowrap ${
                   activeTab === 'security'
-                    ? 'text-on-surface font-bold border-r-4 border-primary bg-primary-container/20'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/50 rounded-r-lg group'
+                    ? 'text-on-surface font-bold border-b-2 md:border-b-0 md:border-r-4 border-primary bg-primary-container/20 rounded-t-lg md:rounded-t-none md:rounded-r-lg'
+                    : 'text-on-surface-variant hover:bg-surface-container-high/50 rounded-lg md:rounded-r-lg group'
                 }`}
               >
                 <span className="material-symbols-outlined text-sm">security</span>
                 <span>Security</span>
               </button>
             </nav>
-            <div className="mt-auto px-4">
+            <div className="hidden md:block mt-auto px-4">
               <div className="flex items-center justify-center gap-3 py-3">
                 <button onClick={() => toggleTheme()} className="w-10 h-10 flex items-center justify-center bg-surface-container rounded-full shadow hover:opacity-90 transition" aria-label="Toggle theme">
                   <span className="material-symbols-outlined">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
@@ -548,11 +551,11 @@ export default function ProfileEditPage() {
           </aside>
 
           {/* Right Content Area */}
-          <div className="flex-1 overflow-y-auto bg-surface-container-lowest p-12">
+          <div className="flex-1 overflow-y-auto bg-surface-container-lowest p-4 sm:p-6 md:p-8 lg:p-12 pb-24 md:pb-28">
             {/* Profile Header Card */}
-            <div className="relative bg-surface-container-low rounded-lg p-8 mb-12 flex flex-col md:flex-row items-center gap-10">
-              <div className="relative group">
-                <div className="w-32 h-32 rounded-full border-4 border-surface-container shadow-lg overflow-hidden">
+            <div className="relative bg-surface-container-low rounded-lg p-4 sm:p-6 md:p-8 mb-6 md:mb-12 flex flex-col md:flex-row items-center gap-4 md:gap-10">
+              <div className="relative group shrink-0">
+                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-surface-container shadow-lg overflow-hidden">
                   {profile?.dp_url ? (
                     <Image
                       src={profile.dp_url}
@@ -569,23 +572,23 @@ export default function ProfileEditPage() {
                 </div>
                 {/* camera overlay removed per user request */}
               </div>
-              <div className="text-center md:text-left flex-1">
-                <h3 className="text-3xl font-extrabold text-primary mb-1">{profile.name}</h3>
+              <div className="text-center md:text-left flex-1 min-w-0">
+                <h3 className="text-xl md:text-3xl font-extrabold text-primary mb-1 truncate">{profile.name}</h3>
                 <div className="flex flex-wrap gap-3 mb-4">
                   <span className="px-3 py-1 bg-primary-container text-on-primary-container rounded-full text-xs font-bold uppercase tracking-wider">ID: {profile.roll_no}</span>
                   <span className="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-xs font-bold uppercase tracking-wider">{profile.branch}</span>
                 </div>
                 <p className="text-secondary body max-w-lg leading-relaxed">{profile.bio || 'No bio added yet.'}</p>
               </div>
-              <div className="absolute top-8 right-8">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={handleShareProfile}
-                    className="bg-primary text-white px-6 py-2 rounded-md font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity"
-                  >
-                    <span className="material-symbols-outlined text-base">share</span> Share Profile
-                  </button>
-                </div>
+              <div className="md:absolute md:top-8 md:right-8 mt-4 md:mt-0">
+                <button
+                  onClick={handleShareProfile}
+                  className="bg-primary text-white px-4 md:px-6 py-2 rounded-md font-bold text-xs md:text-sm flex items-center gap-2 hover:opacity-90 transition-opacity"
+                >
+                  <span className="material-symbols-outlined text-base">share</span>
+                  <span className="hidden sm:inline">Share Profile</span>
+                  <span className="sm:hidden">Share</span>
+                </button>
               </div>
             </div>
 
@@ -598,7 +601,7 @@ export default function ProfileEditPage() {
                     <h4 className="text-xl font-bold text-primary">Personal Details</h4>
                     <span className="text-xs font-bold text-outline uppercase tracking-widest">Last Updated: {new Date().toLocaleDateString()}</span>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 lg:gap-x-12 gap-y-6 md:gap-y-10">
                     <div className="group">
                       <label className="block text-[10px] font-bold text-outline uppercase tracking-widest mb-2 transition-colors group-focus-within:text-primary">Full Name</label>
                       <p className="text-lg font-semibold text-on-surface border-b border-surface-variant pb-2 group-hover:border-primary transition-colors">{profile.name}</p>

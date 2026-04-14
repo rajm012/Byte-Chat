@@ -452,6 +452,7 @@ export default function ChatPage() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isBlocked, ] = useState(false);
   const [sending, setSending] = useState(false);
+  const [showMobileChat, setShowMobileChat] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
   const [showEmojiPickerInput, setShowEmojiPickerInput] = useState(false);
@@ -806,6 +807,7 @@ export default function ChatPage() {
 
   const handleSelectConversation = useCallback((conversation: Conversation) => {
     setSelectedConversation(conversation);
+    setShowMobileChat(true);
     setConversations(prev => prev.map(conv =>
       conv.conversation_id === conversation.conversation_id
         ? { ...conv, unread_count: 0 }
@@ -1202,7 +1204,7 @@ export default function ChatPage() {
           <div className="fixed inset-0 bg-[#002020]/20 dark:bg-black/40 backdrop-blur-md z-40 flex items-center justify-center p-4">
             <div className="w-full h-full md:w-[95%] md:h-[95%] bg-white/80 dark:bg-[#003535]/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,32,32,0.06)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative overflow-hidden flex flex-col md:flex-row border border-white/50 dark:border-[#004a4a]/50">
               {/* Sidebar with conversation skeleton */}
-              <aside className="w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative">
+              <aside className="w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative h-full overflow-hidden">
                 {/* Header */}
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -1225,7 +1227,7 @@ export default function ChatPage() {
                 </div>
 
                 {/* Conversation list skeleton */}
-                <div className="flex-1 overflow-y-auto px-4 space-y-1">
+                <div className="flex-1 overflow-y-auto px-4 space-y-1 scrollbar-visible">
                   {Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 rounded-xl animate-pulse">
                       <div className="w-12 h-12 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20" />
@@ -1243,9 +1245,9 @@ export default function ChatPage() {
               </aside>
 
               {/* Main chat area skeleton */}
-              <main className="hidden md:flex flex-1 flex-col bg-white/50 dark:bg-[#003535]/30 min-h-0">
+              <main className={`flex-1 flex-col bg-white/50 dark:bg-[#003535]/30 h-full overflow-hidden ${showMobileChat ? 'flex' : 'hidden md:flex'}`}>
                 {/* Chat header skeleton */}
-                <div className="px-6 py-4 bg-white/30 dark:bg-[#003535]/30 backdrop-blur-md border-b border-white/30 dark:border-[#004a4a]/30 flex items-center justify-between">
+                <div className="px-4 md:px-6 py-4 bg-white/30 dark:bg-[#003535]/30 backdrop-blur-md border-b border-white/30 dark:border-[#004a4a]/30 flex items-center justify-between shrink-0 sticky top-0 z-20">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
                     <div className="space-y-1">
@@ -1260,7 +1262,7 @@ export default function ChatPage() {
                 </div>
 
                 {/* Messages skeleton */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-visible">
                   {[
                     { isMyMessage: false, width: 'w-2/3' },
                     { isMyMessage: true, width: 'w-1/2' },
@@ -1277,7 +1279,7 @@ export default function ChatPage() {
                 </div>
 
                 {/* Input area skeleton */}
-                <div className="px-4 py-3 bg-white/50 dark:bg-[#003535]/50 backdrop-blur-md border-t border-white/30 dark:border-[#004a4a]/30">
+                <div className="px-4 py-3 bg-white/50 dark:bg-[#003535]/50 backdrop-blur-md border-t border-white/30 dark:border-[#004a4a]/30 shrink-0">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
                     <div className="flex-1 h-11 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 rounded-full animate-pulse" />
@@ -1301,7 +1303,7 @@ export default function ChatPage() {
         {/* Chat Modal Container */}
         <div className="w-full h-full md:w-[95%] md:h-[95%] bg-white/80 dark:bg-[#003535]/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,32,32,0.06)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative overflow-hidden flex flex-col md:flex-row border border-white/50 dark:border-[#004a4a]/50">
           {/* Left Panel: Chat List (35%) */}
-          <aside className="w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative">
+          <aside className={`w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative h-full overflow-hidden ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
             {/* Header */}
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
@@ -1369,7 +1371,7 @@ export default function ChatPage() {
             </div>
 
             {/* Chat List Items */}
-            <div className="flex-1 overflow-y-auto px-4 space-y-1">
+            <div className="flex-1 overflow-y-auto px-4 space-y-1 scrollbar-visible">
               {activeTab === 'conversations' && (
                 <>
                   {filteredConversations.length === 0 ? (
@@ -1507,13 +1509,21 @@ export default function ChatPage() {
           </aside>
 
           {/* Right Panel: Conversation (65%) */}
-          <main className="hidden md:flex md:w-[65%] flex-col bg-white/40 dark:bg-[#002020]/40">
+          <main className={`flex-1 md:w-[65%] flex-col bg-white/40 dark:bg-[#002020]/40 h-full overflow-hidden ${showMobileChat ? 'flex' : 'hidden md:flex'}`}>
             {selectedConversation ? (
               <>
-                {/* Active Chat Top Bar */}
-                <header className="h-20 px-6 flex items-center justify-between border-b border-white/50 dark:border-[#004a4a]/50 bg-white/60 dark:bg-[#003535]/60 backdrop-blur-sm">
-                  <div className="flex items-center gap-4">
-                        {selectedConversation.other_user_dp ? (
+                {/* Active Chat Top Bar - Sticky on mobile */}
+                <header className="h-20 px-4 md:px-6 flex items-center justify-between border-b border-white/50 dark:border-[#004a4a]/50 bg-white/60 dark:bg-[#003535]/60 backdrop-blur-sm shrink-0 sticky top-0 z-20">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    {/* Back button for mobile */}
+                    <button
+                      onClick={() => setShowMobileChat(false)}
+                      className="md:hidden p-2 -ml-2 hover:bg-white/50 dark:hover:bg-[#004040]/50 rounded-full transition-colors"
+                      aria-label="Back to conversations"
+                    >
+                      <span className="material-symbols-outlined text-[#6f787d] dark:text-[#bfc8cd]">arrow_back</span>
+                    </button>
+                    {selectedConversation.other_user_dp ? (
                       !selectedConversation.is_anonymous ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); void navigateToProfileByUserId(selectedConversation.other_user_id); }}
@@ -1590,7 +1600,7 @@ export default function ChatPage() {
                 </header>
 
                 {/* Chat History Area */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4 flex flex-col">
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 flex flex-col scrollbar-visible">
                   {(() => {
                     const shownMessages = messageSearchQuery.trim() ? messageSearchResults : messages;
                     if (loadingMessages) {
@@ -1655,7 +1665,7 @@ export default function ChatPage() {
                 </div>
 
                 {/* Chat Input Area */}
-                <footer className="p-0 bg-white/30 dark:bg-[#003535]/30 backdrop-blur-md border-t border-white/30 dark:border-[#004a4a]/30">
+                <footer className="p-0 bg-white/30 dark:bg-[#003535]/30 backdrop-blur-md border-t border-white/30 dark:border-[#004a4a]/30 shrink-0">
                   {/* Reply Preview */}
                   {replyingTo && (
                     <div className="mb-3 flex items-start gap-2 p-3 rounded-xl bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 border-l-[3px] border-[#0c6780] dark:border-[#87ceeb]">

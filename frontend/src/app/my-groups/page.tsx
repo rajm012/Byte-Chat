@@ -88,6 +88,7 @@ export default function MyGroupsPage() {
   const [, setShowCreatePoll] = useState(false);
   const [showPollTypeMenu, setShowPollTypeMenu] = useState(false);
   const [, setSelectedPollType] = useState<string | null>(null);
+  const [showMobileChat, setShowMobileChat] = useState(false);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -233,6 +234,7 @@ export default function MyGroupsPage() {
   const handleSelectGroup = useCallback((group: MyGroup) => {
     setSelectedGroup(group);
     setShowGroupInfo(false);
+    setShowMobileChat(true);
     loadGroupChat(group);
   }, [loadGroupChat]);
 
@@ -415,7 +417,7 @@ export default function MyGroupsPage() {
           <div className="fixed inset-0 bg-[#002020]/20 dark:bg-black/40 backdrop-blur-md z-40 flex items-center justify-center p-4">
             <div className="w-full h-full md:w-[95%] md:h-[95%] bg-white/80 dark:bg-[#003535]/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,32,32,0.06)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative overflow-hidden flex flex-col md:flex-row border border-white/50 dark:border-[#004a4a]/50">
               {/* Sidebar with skeleton */}
-              <aside className="w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative">
+              <aside className={`w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative h-full overflow-hidden ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-6">
                   {/* Header */}
                   <div className="flex items-center justify-between mb-6">
@@ -433,7 +435,7 @@ export default function MyGroupsPage() {
                 </div>
 
                 {/* Group list skeleton */}
-                <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1">
+                <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1 scrollbar-visible">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 rounded-xl animate-pulse">
                       <div className="w-12 h-12 rounded-xl bg-[#87ceeb]/20 dark:bg-[#0c6780]/20" />
@@ -450,9 +452,9 @@ export default function MyGroupsPage() {
               </aside>
 
               {/* Main area with skeleton */}
-              <main className="hidden md:flex flex-1 flex-col bg-white/50 dark:bg-[#003535]/30 min-h-0">
+              <main className={`flex-1 flex-col bg-white/50 dark:bg-[#003535]/30 h-full overflow-hidden ${showMobileChat ? 'flex' : 'hidden md:flex'}`}>
                 {/* Header skeleton */}
-                <div className="px-6 py-4 bg-white/30 dark:bg-[#003535]/30 backdrop-blur-md border-b border-white/30 dark:border-[#004a4a]/30 flex items-center justify-between">
+                <div className="px-4 md:px-6 py-4 bg-white/30 dark:bg-[#003535]/30 backdrop-blur-md border-b border-white/30 dark:border-[#004a4a]/30 flex items-center justify-between shrink-0 sticky top-0 z-20">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 animate-pulse" />
                     <div className="space-y-1">
@@ -463,7 +465,7 @@ export default function MyGroupsPage() {
                 </div>
 
                 {/* Empty state placeholder */}
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex-1 flex items-center justify-center overflow-y-auto scrollbar-visible">
                   <div className="text-center space-y-4">
                     <div className="w-16 h-16 rounded-full bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 mx-auto animate-pulse" />
                     <div className="h-4 w-40 bg-[#87ceeb]/20 dark:bg-[#0c6780]/20 mx-auto rounded animate-pulse" />
@@ -483,7 +485,7 @@ export default function MyGroupsPage() {
       <div className="dark:bg-[#002020] dark:text-[#e7fffe] min-h-screen">
         <div className="fixed inset-0 bg-[#002020]/20 dark:bg-black/40 backdrop-blur-md z-40 flex items-center justify-center p-4">
           <div className="w-full h-full md:w-[95%] md:h-[95%] bg-white/80 dark:bg-[#003535]/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_40px_rgba(0,32,32,0.06)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative overflow-hidden flex flex-col md:flex-row border border-white/50 dark:border-[#004a4a]/50">
-            <aside className="w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative">
+            <aside className={`w-full md:w-[35%] bg-[#d7fafa]/50 dark:bg-[#003535]/50 flex flex-col border-r border-white/30 dark:border-[#004a4a]/30 relative h-full overflow-hidden ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h1 className="text-2xl font-extrabold tracking-tight text-[#0c6780] dark:text-[#87ceeb] font-['Plus_Jakarta_Sans']">Groups</h1>
@@ -528,7 +530,7 @@ export default function MyGroupsPage() {
                 </Link>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-4 pb-4">
+              <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-visible">
                 {error && (
                   <div className="p-4 mb-4 rounded-xl bg-red-100/50 border border-red-400 text-red-700 text-sm">
                     ⚠️ {error}
@@ -593,7 +595,7 @@ export default function MyGroupsPage() {
               </div>
             </aside>
 
-            <main className="flex-1 flex flex-col bg-white/50 dark:bg-[#003535]/30 min-h-0">
+            <main className={`flex-1 flex-col bg-white/50 dark:bg-[#003535]/30 min-h-0 ${showMobileChat ? 'flex' : 'hidden md:flex'}`}>
               {showGroupInfo && selectedGroup ? (
                 <div className="flex-1 overflow-y-auto p-6">
                   <div className="max-w-2xl mx-auto">
@@ -677,9 +679,17 @@ export default function MyGroupsPage() {
               ) : selectedGroup ? (
                 // Group Chat View
                 <>
-                  {/* Chat Header */}
-                  <header className="px-6 py-4 bg-white/30 dark:bg-[#003535]/30 backdrop-blur-md border-b border-white/30 dark:border-[#004a4a]/30 flex items-center justify-between shrink-0">
+                  {/* Chat Header - Sticky on mobile */}
+                  <header className="px-4 md:px-6 py-4 bg-white/30 dark:bg-[#003535]/30 backdrop-blur-md border-b border-white/30 dark:border-[#004a4a]/30 flex items-center justify-between shrink-0 sticky top-0 z-20">
                     <div className="flex items-center gap-3">
+                      {/* Back button for mobile */}
+                      <button
+                        onClick={() => setShowMobileChat(false)}
+                        className="md:hidden p-2 -ml-2 hover:bg-white/50 dark:hover:bg-[#004040]/50 rounded-full transition-colors"
+                        aria-label="Back to groups"
+                      >
+                        <span className="material-symbols-outlined text-[#6f787d] dark:text-[#bfc8cd]">arrow_back</span>
+                      </button>
                       <button
                         onClick={() => setShowGroupInfo(true)}
                         className="flex items-center gap-3 hover:opacity-80 transition-opacity"
@@ -717,7 +727,7 @@ export default function MyGroupsPage() {
                   </header>
 
                   {/* Messages Area */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-visible">
                     {messages.length === 0 ? (
                       <div className="flex-1 flex items-center justify-center h-full">
                         <div className="text-center">

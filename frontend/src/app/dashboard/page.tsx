@@ -364,7 +364,7 @@ export default function DashboardPage() {
             {Array.from({ length: 12 }).map((_, index) => (
               <div
                 key={index}
-                className={`group relative flex flex-col bg-surface-container-lowest rounded-lg overflow-hidden ${index % 3 === 1 ? 'md:mt-6' : ''}`}
+                className="group relative flex flex-col bg-surface-container-lowest rounded-lg overflow-hidden"
               >
                 {/* Image area */}
                 <div className="aspect-square bg-surface-container-high animate-pulse" />
@@ -655,7 +655,7 @@ export default function DashboardPage() {
               {filteredUsers.map((user, index) => (
                 <div
                   key={user.user_id}
-                  className={`group relative flex flex-col bg-surface-container-lowest rounded-lg overflow-hidden transition-all duration-500 hover:shadow-[0_20px_40px_-10px_rgba(0,32,32,0.15)] hover:-translate-y-1 ${index % 3 === 1 ? 'md:mt-6' : ''}`}
+                  className="group relative flex flex-col bg-surface-container-lowest rounded-lg overflow-hidden transition-all duration-500 hover:shadow-[0_20px_40px_-10px_rgba(0,32,32,0.15)] hover:-translate-y-1"
                 >
                   {/* Image - Shorter aspect ratio */}
                   <div className="aspect-square overflow-hidden relative">
@@ -734,7 +734,7 @@ export default function DashboardPage() {
               {filteredGroups.map((group, index) => (
                 <div
                   key={group.group_id}
-                  className={`group relative flex flex-col bg-surface-container-lowest rounded-lg overflow-hidden transition-all duration-500 hover:shadow-[0_20px_40px_-10px_rgba(0,32,32,0.15)] hover:-translate-y-1 ${index % 3 === 1 ? 'md:mt-6' : ''}`}
+                  className="group relative flex flex-col bg-surface-container-lowest rounded-lg overflow-hidden transition-all duration-500 hover:shadow-[0_20px_40px_-10px_rgba(0,32,32,0.15)] hover:-translate-y-1"
                 >
                   {/* Group Image - Shorter aspect ratio */}
                   <div className="aspect-square overflow-hidden relative">

@@ -355,7 +355,7 @@ export default function MyAnonymousIdentities() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-5 sm:px-8 pt-24 pb-12">
+      <main className="max-w-7xl mx-auto px-5 sm:px-8 pt-24 pb-24 md:pb-28">
 
         {/* Header Section */}
         <header className="mb-10">
@@ -370,14 +370,14 @@ export default function MyAnonymousIdentities() {
               </p>
             </div>
             {/* Stats */}
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2 md:gap-3">
               {[
                 { label: 'Total', value: identities.length, color: 'var(--purple)' },
                 { label: '1V1', value: chatCount, color: 'var(--pink)' },
                 { label: 'Groups', value: groupCount, color: '#22c55e' },
               ].map(s => (
-                <div key={s.label} className="glass rounded-2xl px-5 py-3 text-center min-w-18">
-                  <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
+                <div key={s.label} className="glass rounded-2xl px-3 md:px-5 py-2 md:py-3 text-center min-w-[4rem] md:min-w-18">
+                  <p className="text-xl md:text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
                   <p className="text-xs text-on-surface-variant">{s.label}</p>
                 </div>
               ))}
@@ -386,12 +386,12 @@ export default function MyAnonymousIdentities() {
         </header>
 
         {/* Filter Tabs */}
-        <div className="flex gap-2 mb-8">
+        <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
           {(['all', 'chat', 'group'] as TabType[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setFilter(tab)}
-              className={`px-5 py-2 rounded-full font-semibold text-sm transition-all ${
+              className={`px-4 md:px-5 py-2 rounded-full font-semibold text-sm transition-all whitespace-nowrap shrink-0 ${
                 filter === tab
                   ? 'bg-tertiary-container text-on-tertiary-container hover:scale-105'
                   : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
@@ -444,7 +444,7 @@ export default function MyAnonymousIdentities() {
 
         {/* Empty State */}
         {!isLoading && filteredIdentities.length === 0 && (
-          <div className="glass-strong rounded-3xl p-16 text-center animate-scale-in">
+          <div className="glass-strong rounded-3xl p-8 md:p-16 text-center animate-scale-in">
             <span className="material-symbols-outlined text-6xl text-on-surface-variant mb-4 block">theater_comedy</span>
             <h3 className="text-xl font-bold text-on-surface mb-2">
               No anonymous identities yet

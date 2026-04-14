@@ -22,10 +22,10 @@ const developers: Developer[] = [
     name: 'Divyansh Jain',
     role: 'Team Lead & Database Engineer',
     avatar: '/Divyansh.jpeg',
-    bio: 'Leading the development team and crafting the user interface. Coordinating project milestones, managing workflows, and ensuring seamless integration between frontend and backend systems.',
+    bio: 'Nothing changes is nothing changes.',
     email: 'b23397@students.iitmandi.ac.in',
-    expertise: ['Next.js', 'React', 'UI Design', 'Project Management', 'Team Coordination'],
-    color: 'blue',
+    expertise: ['PostgreSQL', 'Cloudinary', 'Database Security', 'Cloud Storage', 'Data Migration'],
+    color: 'yellow',
   },
   {
     id: 2,
@@ -52,10 +52,10 @@ const developers: Developer[] = [
     name: 'Vyom Thacker',
     role: 'Frontend Developer',
     avatar: '/Vyom.jpeg',
-    bio: 'Implementing robust database solutions and cloud storage integrations. Specializing in media management, data persistence, and ensuring high availability of services.',
+    bio: 'Find What you Love and Let it Kill you.',
     email: 'b23417@students.iitmandi.ac.in',
-    expertise: ['PostgreSQL', 'Cloudinary', 'Database Security', 'Cloud Storage', 'Data Migration'],
-    color: 'yellow',
+    expertise: ['Next.js', 'TypeScript', 'Tailwind CSS', 'Responsive Design', 'Component Architecture'],
+    color: 'blue',
   },
   {
     id: 5,
@@ -158,34 +158,42 @@ export default function ContactPage() {
         {/* Developer cards grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
           {developers.map((dev) => (
-            <div key={dev.id} className="glass-strong rounded-3xl p-6 flex flex-col gap-4 animate-scale-in border border-white/10 dark:border-white/5 hover:border-primary/20 transition-colors">
-              {/* Avatar + name */}
-              <div className="flex items-center gap-4">
-                <div className="relative w-16 h-16 rounded-2xl overflow-hidden shrink-0 ring-2 ring-outline-variant/30">
-                  <Image
-                    src={dev.avatar}
-                    alt={dev.name}
-                    fill
-                    className="object-cover"
-                    sizes="64px"
-                    placeholder="blur"
-                    blurDataURL="data:image/svg+xml,%3Csvg width='64' height='64' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='64' height='64' fill='%23e0f2fe'/%3E%3C/svg%3E"
-                  />
-                </div>
-                <div>
-                  <p className="font-bold text-base text-on-surface">{dev.name}</p>
-                  <p className="text-sm text-on-surface-variant">{dev.role}</p>
-                </div>
+            <div
+              key={dev.id}
+              className="glass-strong rounded-3xl p-6 flex flex-col items-center gap-4 animate-scale-in border border-white/10 dark:border-white/5 hover:border-primary/20 transition-colors"
+            >
+              {/* Avatar — large, centered, circular */}
+              <div
+                className="relative rounded-full overflow-hidden shrink-0 ring-4 ring-outline-variant/30 shadow-lg"
+                style={{ width: 120, height: 120 }}
+              >
+                <Image
+                  src={dev.avatar}
+                  alt={dev.name}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 640px) 120px, 120px"
+                  placeholder="blur"
+                  blurDataURL="data:image/svg+xml,%3Csvg width='120' height='120' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='120' height='120' fill='%23e0f2fe'/%3E%3C/svg%3E"
+                />
+              </div>
+
+              {/* Name + Role */}
+              <div className="text-center">
+                <p className="font-bold text-lg text-on-surface">{dev.name}</p>
+                <p className="text-sm text-on-surface-variant mt-0.5">{dev.role}</p>
               </div>
 
               {/* Bio */}
-              <p className="text-sm leading-relaxed text-on-surface-variant">{dev.bio}</p>
+              <p className="text-sm leading-relaxed text-on-surface-variant text-center">{dev.bio}</p>
 
               {/* Expertise tags */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
                 {dev.expertise.map((skill) => (
-                  <span key={skill}
-                    className="glass rounded-full px-3 py-1.5 text-xs font-medium text-on-surface-variant border border-outline-variant/20">
+                  <span
+                    key={skill}
+                    className="glass rounded-full px-3 py-1.5 text-xs font-medium text-on-surface-variant border border-outline-variant/20"
+                  >
                     {skill}
                   </span>
                 ))}
@@ -194,7 +202,7 @@ export default function ContactPage() {
               {/* Email link */}
               <a
                 href={`mailto:${dev.email}`}
-                className="btn-romance flex items-center justify-center gap-2 py-2.5 text-xs sm:text-sm font-semibold rounded-xl mt-auto truncate"
+                className="btn-romance w-full flex items-center justify-center gap-2 py-2.5 text-xs sm:text-sm font-semibold rounded-xl mt-auto"
               >
                 <FiMail className="w-4 h-4 shrink-0" />
                 <span className="truncate">{dev.email}</span>

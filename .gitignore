@@ -10,6 +10,5 @@ frontend/.env
 
 # others
 .env
-frontend/.next/
 
 backend/dist/

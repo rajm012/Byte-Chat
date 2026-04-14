@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///home/rajm012/Desktop/Byte-Chat/frontend/src/services/apiBase.ts"],"sourcesContent":["\n// Centralized API base URL utility\nexport const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;\n"],"names":[],"mappings":"AACA,mCAAmC;;;;;AAC5B,MAAM"}}]
+}
