@@ -54,15 +54,18 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!hasSession) {
+    // Double-check auth before connecting - check both user and token
+    const user = authService.getCurrentUser();
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const shouldConnect = hasSession && (user || token);
+
+    if (!shouldConnect) {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
-      const timer = window.setTimeout(() => {
-        setIsConnected(false);
-      }, 0);
-      return () => window.clearTimeout(timer);
+      setIsConnected(false);
+      return;
     }
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -85,6 +88,11 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     });
 
     socketInstance.on('connect_error', (error) => {
+      // Silently ignore auth errors for unauthenticated users
+      if (error.message?.includes('Authentication error') || error.message?.includes('No valid session')) {
+        // Expected error when not logged in - don't spam console
+        return;
+      }
       console.error('Socket connection error:', error.message);
       setIsConnected(false);
     });

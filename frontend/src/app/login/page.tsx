@@ -333,7 +333,9 @@ export default function AuthPage() {
         <section className="auth-form-panel auth-form-scrollable">
           {/* Mobile brand header */}
           <div className="auth-mobile-brand">
-            <span className="auth-brand-name">ByteChat</span>
+            <Link href="/" className="auth-brand-link">
+              <span className="auth-brand-name">ByteChat</span>
+            </Link>
           </div>
 
           <div className="auth-form-content">
@@ -624,7 +626,9 @@ function IllustrationPanel() {
 
       {/* Branding */}
       <div className="auth-brand">
-        <span className="auth-brand-name">ByteChat</span>
+        <Link href="/" className="auth-brand-link">
+          <span className="auth-brand-name">ByteChat</span>
+        </Link>
         <p className="auth-brand-tagline">Own Digital Room for IIT Mandi.</p>
       </div>
 

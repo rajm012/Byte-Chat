@@ -107,12 +107,12 @@ export default function ForgotPasswordPage() {
 
   if (step === 'reset') {
     return (
-      <div className="min-h-screen bg-mesh-warm antialiased flex items-center justify-center p-4">
+      <div className="min-h-screen bg-mesh-warm antialiased flex items-center justify-center p-3 sm:p-4">
         <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-          <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-linear-to-br from-coral-300/10 to-transparent rounded-full blur-3xl" />
+          <div className="absolute top-[-10%] right-[-10%] w-72 h-72 sm:w-96 sm:h-96 bg-linear-to-br from-coral-300/10 to-transparent rounded-full blur-3xl" />
         </div>
 
-        <div className="w-full max-w-md animate-scale-in">
+        <div className="w-full max-w-md animate-scale-in px-1 sm:px-0">
           <div className="text-center mb-6">
             <div className="text-4xl mb-2">🔑</div>
             <h1 className="text-2xl font-bold" style={{ color: 'var(--heading)' }}>Reset Password</h1>
@@ -196,13 +196,13 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-mesh-warm antialiased flex items-center justify-center p-4">
+    <div className="min-h-screen bg-mesh-warm antialiased flex items-center justify-center p-3 sm:p-4">
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-linear-to-br from-pink-300/15 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-80 h-80 bg-linear-to-tr from-purple-300/10 to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-[-10%] right-[-10%] w-72 h-72 sm:w-96 sm:h-96 bg-linear-to-br from-pink-300/15 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-64 h-64 sm:w-80 sm:h-80 bg-linear-to-tr from-purple-300/10 to-transparent rounded-full blur-3xl" />
       </div>
 
-      <div className="w-full max-w-md animate-scale-in">
+      <div className="w-full max-w-md animate-scale-in px-1 sm:px-0">
         <div className="text-center mb-6">
           <div className="text-4xl mb-2">🔒</div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--heading)' }}>Forgot Password</h1>

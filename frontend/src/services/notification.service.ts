@@ -38,7 +38,11 @@ export async function fetchNotifications(): Promise<{
   count: number;
 }> {
   const res = await api('/api/notifications');
-  if (!res.ok) throw new Error('Failed to fetch notifications');
+  if (res.status === 401) {
+    // Return empty data for unauthenticated users (don't throw)
+    return { notifications: [], count: 0 };
+  }
+  if (!res.ok) throw new Error(`Failed to fetch notifications: ${res.status}`);
   const json = await res.json();
   // Backend returns unreadCount, map it to count for the frontend
   return {

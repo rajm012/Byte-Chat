@@ -17,15 +17,15 @@ export default function ImpressUsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-mesh-warm antialiased flex items-center justify-center p-4">
+    <div className="min-h-screen bg-mesh-warm antialiased flex items-center justify-center p-3 sm:p-4">
       {/* Background blobs */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-linear-to-br from-pink-300/15 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-[-10%] left-[-5%] w-80 h-80 bg-linear-to-tr from-purple-300/10 to-transparent rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-linear-to-br from-orange-300/8 to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-[-10%] right-[-5%] w-72 h-72 sm:w-96 sm:h-96 bg-linear-to-br from-pink-300/15 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-[-10%] left-[-5%] w-64 h-64 sm:w-80 sm:h-80 bg-linear-to-tr from-purple-300/10 to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 sm:w-64 sm:h-64 bg-linear-to-br from-orange-300/8 to-transparent rounded-full blur-3xl" />
       </div>
 
-      <div className="w-full max-w-lg animate-scale-in">
+      <div className="w-full max-w-lg animate-scale-in px-1 sm:px-0">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/"

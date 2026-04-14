@@ -41,6 +41,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   /** Load initial state from the Redis-backed API */
   const refresh = useCallback(async () => {
+    // Skip if not authenticated to avoid 401 errors
+    if (!authService.getCurrentUser()) {
+      setNotifications([]);
+      setCount(0);
+      return;
+    }
     try {
       const data = await fetchNotifications();
       setNotifications(data.notifications);
@@ -130,6 +136,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // On reconnect, refresh from API to recover any notifications missed while offline.
   useEffect(() => {
     if (!isConnected) return;
+    // Only fetch if user is authenticated
+    if (!authService.getCurrentUser()) return;
     const timer = window.setTimeout(() => {
       void refresh();
     }, 0);

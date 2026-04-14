@@ -82,15 +82,15 @@ export default function EncryptionPage() {
     <div className="min-h-screen bg-mesh-warm antialiased">
       {/* Navigation Header */}
       <nav className="glass-nav fixed top-0 w-full z-50">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-14 sm:h-16 flex items-center justify-between">
           {/* Logo - Link to Home */}
-          <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--primary)' }}>
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--primary)' }}>
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <span className="text-xl font-bold text-on-surface">
+            <span className="text-lg sm:text-xl font-bold text-on-surface">
               Byte<span className="text-primary">Chat</span>
             </span>
           </Link>
@@ -116,17 +116,17 @@ export default function EncryptionPage() {
         <div className="absolute bottom-[-10%] left-1/3 w-80 h-80 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(236,72,153,0.14), transparent 72%)' }} />
       </div>
 
-      <div className="max-w-6xl mx-auto pt-24 px-4 sm:px-6 pb-10">
-        <div className="mb-6 text-xs sm:text-sm rounded-full px-4 py-2 glass text-on-surface-variant inline-flex items-center">
+      <div className="max-w-6xl mx-auto pt-20 sm:pt-24 px-4 sm:px-6 pb-10">
+        <div className="mb-4 sm:mb-6 text-xs sm:text-sm rounded-full px-3 sm:px-4 py-2 glass text-on-surface-variant inline-flex items-center">
           <FiShield className="inline w-4 h-4 mr-1" />
           Security &amp; Transparency
         </div>
 
-        <section className="glass-strong rounded-3xl p-8 sm:p-12 mb-8 animate-fade-in border border-white/10 dark:border-white/5">
+        <section className="glass-strong rounded-3xl p-6 sm:p-8 lg:p-12 mb-8 animate-fade-in border border-white/10 dark:border-white/5">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-xs uppercase tracking-[0.25em] text-on-surface-variant">ByteChat Trust Center</span>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold leading-tight mb-4 text-on-surface">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight mb-4 text-on-surface">
             Your messages are private.
             <br />
             <span className="text-primary">Even from us.</span>

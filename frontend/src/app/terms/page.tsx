@@ -34,15 +34,15 @@ export default function TermsAndConditions() {
     <div className="min-h-screen bg-mesh-warm antialiased">
       {/* Navigation Header */}
       <nav className="glass-nav fixed top-0 w-full z-50">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-14 sm:h-16 flex items-center justify-between">
           {/* Logo - Link to Home */}
-          <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--primary)' }}>
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--primary)' }}>
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <span className="text-xl font-bold text-on-surface">
+            <span className="text-lg sm:text-xl font-bold text-on-surface">
               Byte<span className="text-primary">Chat</span>
             </span>
           </Link>
@@ -67,34 +67,55 @@ export default function TermsAndConditions() {
         <div className="absolute bottom-[-10%] left-[-5%] w-80 h-80 bg-linear-to-tr from-tertiary-container/15 to-transparent rounded-full blur-3xl" />
       </div>
 
-      <div className="max-w-4xl mx-auto pt-24 px-4 pb-12">
-
-        <div className="glass-strong rounded-3xl p-8 sm:p-12 animate-fade-in border border-white/10 dark:border-white/5">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-linear-to-br from-secondary-container to-primary-container mb-6 shadow-lg">
-              <FiFileText className="w-10 h-10 text-on-secondary-container" />
+      <div className="max-w-5xl mx-auto pt-20 sm:pt-24 px-4 pb-12">
+        {/* Hero Banner */}
+        <div className="relative rounded-3xl overflow-hidden mb-8 animate-fade-in">
+          <div className="absolute inset-0 bg-linear-to-br from-primary-container via-secondary-container to-tertiary-container opacity-30" />
+          <div className="relative glass-strong p-8 sm:p-12 text-center border border-white/20 dark:border-white/10">
+            <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-surface mb-6 shadow-xl">
+              <FiFileText className="w-10 h-10 sm:w-12 sm:h-12 text-primary" />
             </div>
-            <h1 className="text-4xl sm:text-5xl font-extrabold mb-3 text-on-surface">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-3 text-on-surface">
               Terms &amp; Conditions
             </h1>
-            <p className="text-sm text-on-surface-variant font-medium">Last Updated: February 10, 2026</p>
+            <p className="text-sm sm:text-base text-on-surface-variant max-w-lg mx-auto">
+              The rules that keep our campus community safe, respectful, and awesome.
+            </p>
+            <p className="text-xs text-on-surface-variant/70 mt-4">Last Updated: February 10, 2026</p>
           </div>
+        </div>
 
-          <div className="space-y-10">
-            {/* Welcome */}
-            <section className="glass rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center">
-                  <span className="text-xl">👋</span>
+        <div className="space-y-8">
+            {/* Welcome Card */}
+            <section className="glass-strong rounded-2xl p-6 sm:p-8 border-l-4 border-primary">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary-container flex items-center justify-center shrink-0">
+                  <span className="text-2xl">👋</span>
                 </div>
-                <h2 className="text-2xl font-bold text-on-surface">Welcome to BYTE-CHAT</h2>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-on-surface mb-3">Welcome to BYTE-CHAT</h2>
+                  <p className="text-sm leading-relaxed text-on-surface-variant">
+                    By accessing or using this application, you agree to be bound by these Terms and Conditions.
+                    This platform is designed exclusively for college students to connect, communicate, and build a supportive campus community.
+                  </p>
+                </div>
               </div>
-              <p className="text-sm leading-relaxed text-on-surface-variant">
-                Welcome to our campus social platform! By accessing or using this application, you agree to be bound by these Terms and Conditions.
-                This platform is designed exclusively for college students to connect, communicate, and build a supportive campus community.
-              </p>
             </section>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { num: '12', label: 'Sections', color: 'primary' },
+                { num: '18+', label: 'Age Required', color: 'secondary' },
+                { num: '100%', label: 'Student Verified', color: 'tertiary' },
+                { num: '0', label: 'Tolerance for Abuse', color: 'error' },
+              ].map((stat) => (
+                <div key={stat.label} className="glass rounded-2xl p-4 text-center">
+                  <p className={`text-2xl sm:text-3xl font-black text-${stat.color}`}>{stat.num}</p>
+                  <p className="text-xs text-on-surface-variant mt-1">{stat.label}</p>
+                </div>
+              ))}
+            </div>
 
             {/* 1. User Eligibility */}
             <section>
@@ -437,6 +458,6 @@ export default function TermsAndConditions() {
           </div>
         </div>
       </div>
-    </div>
+    // </div>
   );
 }
