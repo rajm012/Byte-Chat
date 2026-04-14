@@ -49,7 +49,7 @@ const developers: Developer[] = [
   },
   {
     id: 4,
-    name: 'Thacker Vyom',
+    name: 'Vyom Thacker',
     role: 'Frontend Developer',
     avatar: '/Vyom.jpeg',
     bio: 'Implementing robust database solutions and cloud storage integrations. Specializing in media management, data persistence, and ensuring high availability of services.',
