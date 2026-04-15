@@ -153,9 +153,21 @@ async function getPresenceTargetIds(userId: string): Promise<{ conversationIds: 
 
 export function initializeSocket(httpServer: HTTPServer) {
   maybeStartSocketMetricsLogger();
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'https://localhost:3000',
+    config.cors.frontendUrl
+  ];
+
   const io = new SocketServer(httpServer, {
     cors: {
-      origin: config.cors.frontendUrl,
+      origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.trycloudflare.com')) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       credentials: true,
     },
   });

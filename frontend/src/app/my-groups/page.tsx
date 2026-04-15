@@ -89,6 +89,7 @@ export default function MyGroupsPage() {
   const [showPollTypeMenu, setShowPollTypeMenu] = useState(false);
   const [, setSelectedPollType] = useState<string | null>(null);
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -193,10 +194,18 @@ export default function MyGroupsPage() {
           return aesKey;
         } catch (err) {
           console.error('[E2EE] Failed to decrypt session key:', err);
+          return null;
         }
       }
 
-      // Generate new key if none exists
+      // Check if there are existing encrypted messages that need decryption
+      const hasEncryptedMessages = msgs.some(m => m.encrypted_content && m.content_iv && m.content_auth_tag);
+      if (hasEncryptedMessages) {
+        console.warn('[E2EE] Existing encrypted messages found but no session key available. Messages will remain encrypted.');
+        return null;
+      }
+
+      // Generate new key only for empty conversations (no existing encrypted messages)
       const newKey = await generateAESKey();
       setSessionKey(newKey);
       setIsE2EEReady(true);
@@ -431,7 +440,7 @@ export default function MyGroupsPage() {
                   </div>
 
                   {/* Create button placeholder */}
-                  <div className="w-full py-3 px-4 rounded-xl h-11 bg-gradient-to-r from-[#87ceeb]/30 to-[#ffb6c1]/30 dark:from-[#0c6780]/30 dark:to-[#4a6368]/30 animate-pulse" />
+                  <div className="w-full py-3 px-4 rounded-xl h-11 bg-linear-to-r from-[#87ceeb]/30 to-[#ffb6c1]/30 dark:from-[#0c6780]/30 dark:to-[#4a6368]/30 animate-pulse" />
                 </div>
 
                 {/* Group list skeleton */}
@@ -877,32 +886,51 @@ export default function MyGroupsPage() {
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
 
                     <form onSubmit={handleSendMessage} className="flex items-center gap-2 p-3">
-                      <div className="flex items-center gap-1">
+                      {/* More Options Menu - Groups attach, emoji, poll into one */}
+                      <div className="relative shrink-0">
                         <button
                           type="button"
-                          onClick={() => fileInputRef.current?.click()}
+                          onClick={() => setShowMoreOptions(!showMoreOptions)}
                           disabled={sending || uploadingImage}
-                          className="w-10 h-10 rounded-xl bg-white/50 dark:bg-[#004040]/50 flex items-center justify-center text-[#6f787d] dark:text-[#bfc8cd] hover:bg-[#87ceeb]/20 dark:hover:bg-[#0c6780]/30 transition-colors disabled:opacity-50"
-                        >
-                          <span className="material-symbols-outlined">attach_file</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                          disabled={sending || uploadingImage}
-                          className="w-10 h-10 rounded-xl bg-white/50 dark:bg-[#004040]/50 flex items-center justify-center text-[#6f787d] dark:text-[#bfc8cd] hover:bg-[#87ceeb]/20 dark:hover:bg-[#0c6780]/30 transition-colors disabled:opacity-50"
-                        >
-                          <span className="material-symbols-outlined">sentiment_satisfied</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowPollTypeMenu(!showPollTypeMenu)}
                           className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                            showPollTypeMenu ? 'bg-[#87ceeb]/30 text-[#0c6780]' : 'bg-white/50 dark:bg-[#004040]/50 text-[#6f787d] dark:text-[#bfc8cd] hover:bg-[#87ceeb]/20 dark:hover:bg-[#0c6780]/30'
+                            showMoreOptions ? 'bg-[#87ceeb]/30 text-[#0c6780]' : 'bg-white/50 dark:bg-[#004040]/50 text-[#6f787d] dark:text-[#bfc8cd] hover:bg-[#87ceeb]/20 dark:hover:bg-[#0c6780]/30'
                           }`}
                         >
-                          <span className="material-symbols-outlined">poll</span>
+                          <span className="material-symbols-outlined">add</span>
                         </button>
+                        
+                        {showMoreOptions && (
+                          <div className="absolute bottom-full left-0 mb-2 bg-white/95 dark:bg-[#004040]/95 backdrop-blur-xl rounded-xl p-2 shadow-xl border border-white/30 dark:border-[#004a4a]/30 z-50 flex flex-col gap-1 min-w-11">
+                            <button
+                              type="button"
+                              onClick={() => { fileInputRef.current?.click(); setShowMoreOptions(false); }}
+                              disabled={sending || uploadingImage}
+                              className="w-10 h-10 rounded-lg bg-white/50 dark:bg-[#004040]/50 flex items-center justify-center text-[#6f787d] dark:text-[#bfc8cd] hover:bg-[#87ceeb]/20 dark:hover:bg-[#0c6780]/30 transition-colors disabled:opacity-50"
+                              title="Attach file"
+                            >
+                              <span className="material-symbols-outlined text-sm">attach_file</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowMoreOptions(false); }}
+                              disabled={sending || uploadingImage}
+                              className="w-10 h-10 rounded-lg bg-white/50 dark:bg-[#004040]/50 flex items-center justify-center text-[#6f787d] dark:text-[#bfc8cd] hover:bg-[#87ceeb]/20 dark:hover:bg-[#0c6780]/30 transition-colors disabled:opacity-50"
+                              title="Emoji"
+                            >
+                              <span className="material-symbols-outlined text-sm">sentiment_satisfied</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setShowPollTypeMenu(!showPollTypeMenu); setShowMoreOptions(false); }}
+                              className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                                showPollTypeMenu ? 'bg-[#87ceeb]/30 text-[#0c6780]' : 'bg-white/50 dark:bg-[#004040]/50 text-[#6f787d] dark:text-[#bfc8cd] hover:bg-[#87ceeb]/20 dark:hover:bg-[#0c6780]/30'
+                              }`}
+                              title="Create poll"
+                            >
+                              <span className="material-symbols-outlined text-sm">poll</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <input

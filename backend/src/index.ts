@@ -30,6 +30,9 @@ import { connectRedis } from './lib/redis.js';
 const app: Express = express();
 const httpServer = createServer(app);
 
+// Trust proxy for Cloudflare/Tunnels
+app.set('trust proxy', 1);
+
 // Connect to Redis at server startup
 connectRedis();
 startCacheMetricsLogger();
@@ -59,12 +62,24 @@ app.use(compression({
 app.use(helmet());
 
 // CORS
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://localhost:3000',
+  config.cors.frontendUrl
+];
+
 app.use(cors({
-  origin: config.cors.frontendUrl,
+  origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || origin.endsWith('.trycloudflare.com')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
-
-// Rate limiting
 
 // Global rate limiter (broad, but skips message endpoints)
 const globalLimiter = rateLimit({
@@ -83,7 +98,7 @@ app.use(globalLimiter);
 // Dedicated message endpoint limiter (stricter)
 const messageLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 30, // 30 requests per minute per IP
+  max: 100, // 100 requests per minute per IP (increased from 30)
   message: 'Too many message requests, slow down.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -103,9 +118,6 @@ app.use('/api/test', testRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/anonymous', anonymousRoutes);
 app.use('/api/settings', settingsRoutes);
-
-// Attach messageLimiter to all message-related endpoints
-// (imports moved below for per-route limiter)
 
 // Chat message endpoints
 app.use('/api/chat/conversation/:conversationId/messages', messageLimiter);

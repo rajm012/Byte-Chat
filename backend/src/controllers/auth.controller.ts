@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../lib/db.js';
 import { redis } from '../lib/redis.js';
-import { config } from '../config/index.js';
 
 // Utils
 import { verifyAccessToken, verifyRefreshToken, generateAccessToken, generateRefreshToken } from '../utils/jwt.util.js';
@@ -50,14 +49,25 @@ function getTokenRemainingTtl(token: string): number {
 }
 
 
-// Helper: Set access token as HTTP-only cookie
-function setAccessTokenCookie(res: Response, accessToken: string) {
-  res.cookie('accessToken', accessToken, {
+// Helper: Get dynamic cookie options based on origin
+function getCookieOptions(req: Request, maxAge: number) {
+  const origin = req.headers.origin || '';
+  const isTunnel = origin.endsWith('.trycloudflare.com');
+
+  return {
     httpOnly: true,
-    secure: config.server.nodeEnv === 'production',
-    sameSite: 'strict',
-    maxAge: 15 * 60 * 1000, // 15 minutes
-  });
+    // Secure is required for sameSite: 'none' (tunnels), 
+    // but can be false for localhost if not using HTTPS
+    secure: isTunnel || req.secure || req.headers['x-forwarded-proto'] === 'https',
+    sameSite: isTunnel ? 'none' as const : 'lax' as const,
+    maxAge,
+  };
+}
+
+
+// Helper: Set access token as HTTP-only cookie
+function setAccessTokenCookie(req: Request, res: Response, accessToken: string) {
+  res.cookie('accessToken', accessToken, getCookieOptions(req, 15 * 60 * 1000)); // 15 minutes
 }
 
 
@@ -163,13 +173,8 @@ export async function refreshTokenHandler(req: Request, res: Response) {
     }
 
     // Set cookies
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: config.server.nodeEnv === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-    setAccessTokenCookie(res, newAccessToken);
+    res.cookie('refreshToken', newRefreshToken, getCookieOptions(req, 7 * 24 * 60 * 60 * 1000)); // 7 days
+    setAccessTokenCookie(req, res, newAccessToken);
 
     return res.status(200).json({
       success: true,
@@ -440,13 +445,8 @@ export async function verifyOTP(req: Request, res: Response) {
       await storeRefreshToken(userId, refreshTokenHash);
 
       // Set refresh token as HTTP-only cookie
-      res.cookie('refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: config.server.nodeEnv === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-      });
-      setAccessTokenCookie(res, accessToken);
+      res.cookie('refreshToken', refreshToken, getCookieOptions(req, 7 * 24 * 60 * 60 * 1000)); // 7 days
+      setAccessTokenCookie(req, res, accessToken);
 
       // Get user details
       const userDetails = await pool.query(
@@ -627,13 +627,8 @@ export async function login(req: Request, res: Response) {
     await storeRefreshToken(user.user_id, refreshTokenHash);
 
     // Set refresh token as HTTP-only cookie
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: config.server.nodeEnv === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-    setAccessTokenCookie(res, accessToken);
+    res.cookie('refreshToken', refreshToken, getCookieOptions(req, 7 * 24 * 60 * 60 * 1000)); // 7 days
+    setAccessTokenCookie(req, res, accessToken);
 
     // Clear login attempts on success
     await redis.del(attemptKey);

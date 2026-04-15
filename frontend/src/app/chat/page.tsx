@@ -720,14 +720,23 @@ export default function ChatPage() {
       }
 
       setMessages((prev) => {
+        // Check if message already exists
         const existingIndex = prev.findIndex((msg) => msg.message_id === processedMessage.message_id);
-        if (existingIndex === -1) {
-          return [...prev, processedMessage];
+        if (existingIndex !== -1) {
+          // Update existing message
+          const next = [...prev];
+          next[existingIndex] = processedMessage;
+          return next;
         }
 
-        const next = [...prev];
-        next[existingIndex] = processedMessage;
-        return next;
+        // If this is my message, remove any optimistic temp messages first
+        let filtered = prev;
+        if (processedMessage.is_my_message) {
+          filtered = prev.filter((msg) => !msg.message_id?.startsWith('temp-'));
+        }
+
+        // Add the new message
+        return [...filtered, processedMessage];
       });
     };
 
@@ -922,16 +931,54 @@ export default function ChatPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      // Reload messages
-      loadMessages(selectedConversation);
-      // Refresh conversations list
-      fetchConversations();
+
+      // OPTIMISTIC UI: Add message immediately to UI without waiting for server
+      // Use the original content (not encrypted) for display
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMessage: Message = {
+        message_id: tempId,
+        conversation_id: selectedConversation.conversation_id,
+        sender_id: 'me',
+        sender_name: 'You',
+        sender_gender: '',
+        encrypted_content: content, // Show original text while sending
+        content_iv: '',
+        content_auth_tag: '',
+        message_type: selectedImage ? 'image' : 'text',
+        created_at: new Date(),
+        updated_at: new Date(),
+        is_anonymous: isAnonymous,
+        is_my_message: true,
+        is_edited: false,
+        is_deleted: false,
+        parent_message: replyingTo ? {
+          message_id: replyingTo.message_id,
+          encrypted_content: replyingTo.encrypted_content,
+          content_iv: replyingTo.content_iv || '',
+          content_auth_tag: replyingTo.content_auth_tag || '',
+          sender: replyingTo.sender,
+        } : undefined,
+      };
+
+      // Add to UI immediately
+      setMessages((prev) => [...prev, optimisticMessage]);
+
+      // Scroll to bottom immediately
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 50);
+
+      // Refresh conversations list in background (don't block)
+      fetchConversations().catch(() => {});
+
+      // Note: We don't call loadMessages() - Socket.IO will add the real message
+      // and replace the optimistic one when it arrives
     } catch (error) {
       console.error('Failed to send message:', error);
     } finally {
       setSending(false);
     }
-  }, [messageInput, selectedImage, selectedConversation, sending, isBlocked, isE2EEReady, sessionKey, keyId, isAnonymous, loadMessages, fetchConversations, replyingTo]);
+  }, [messageInput, selectedImage, selectedConversation, sending, isBlocked, isE2EEReady, sessionKey, keyId, isAnonymous, fetchConversations, replyingTo]);
 
   const fetchChatRequests = useCallback(async () => {
     try {

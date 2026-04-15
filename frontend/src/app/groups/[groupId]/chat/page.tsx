@@ -117,7 +117,15 @@ export default function GroupChatPage() {
           return aesKey;
         } catch (err) {
           console.error('[E2EE] Failed to decrypt session key:', err);
+          return null;
         }
+      }
+
+      // Check if there are existing encrypted messages that need decryption
+      const hasEncryptedMessages = msgs.some(m => m.encrypted_content && m.content_iv && m.content_auth_tag);
+      if (hasEncryptedMessages) {
+        console.warn('[E2EE] Existing encrypted messages found but no session key available. Messages will remain encrypted.');
+        return null;
       }
 
       const info = await groupService.getGroupParticipantPublicKeys(groupId);
@@ -271,17 +279,19 @@ export default function GroupChatPage() {
 
       // Use ref to get latest sessionKey
       const currentSessionKey = sessionKeyRef.current;
-      if (currentSessionKey && message.encrypted_content) {
+      // Only decrypt if we have all required fields
+      if (currentSessionKey && message.encrypted_content && message.content_iv && message.content_auth_tag) {
         try {
           const decrypted = await decryptMessageAES(
             message.encrypted_content,
-            message.content_iv || '',
-            message.content_auth_tag || '',
+            message.content_iv,
+            message.content_auth_tag,
             currentSessionKey
           );
           processedMessage.encrypted_content = decrypted;
         } catch (err) {
           console.warn('[E2EE] Failed to decrypt real-time message:', err);
+          processedMessage.encrypted_content = '[Encrypted Message]';
         }
       }
 
@@ -478,58 +488,6 @@ export default function GroupChatPage() {
     if (messageDate.getTime() === yesterday.getTime()) return 'Yesterday';
     return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
   };
-
-  // const handleReply = useCallback((message: Message) => {
-  //   setReplyingTo(message as Message);
-  //   messageInputRef.current?.focus();
-  // }, []);
-
-  // const handleEdit = useCallback(async (messageId: string, newContent: string) => {
-  //   try {
-  //     if (!localStorage.getItem('user')) {
-  //       toast.error('Authentication required');
-  //       return;
-  //     }
-  //     let encryptedContent = newContent;
-  //     let contentIv = '';
-  //     let contentAuthTag = '';
-
-  //     if (sessionKey) {
-  //       try {
-  //         const encrypted = await encryptMessageAES(newContent, sessionKey);
-  //         encryptedContent = encrypted.ciphertext;
-  //         contentIv = encrypted.iv;
-  //         contentAuthTag = encrypted.authTag;
-  //       } catch (err) {
-  //         console.error('[E2EE] Edit encryption failed:', err);
-  //         toast.error('Failed to encrypt edit');
-  //         return;
-  //       }
-  //     }
-
-  //     await messageManagementService.editMessage(messageId, encryptedContent, contentIv, contentAuthTag, '');
-  //     toast.success('Message edited');
-  //     fetchMessages();
-  //   } catch (error) {
-  //     console.error('Failed to edit message:', error);
-  //     toast.error('Failed to edit message');
-  //   }
-  // }, [fetchMessages, toast, sessionKey]);
-
-  // const handleDelete = useCallback(async (messageId: string, deleteForEveryone: boolean) => {
-  //   try {
-  //     if (!localStorage.getItem('user')) {
-  //       toast.error('Authentication required');
-  //       return;
-  //     }
-  //     await messageManagementService.deleteMessage(messageId, deleteForEveryone, '');
-  //     toast.success(deleteForEveryone ? 'Message deleted for everyone' : 'Message deleted for you');
-  //     fetchMessages();
-  //   } catch (error) {
-  //     console.error('Failed to delete message:', error);
-  //     toast.error('Failed to delete message');
-  //   }
-  // }, [fetchMessages, toast]);
 
   const handleVote = async (pollId: string, voteValue: boolean) => {
     try {

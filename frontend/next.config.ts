@@ -32,6 +32,12 @@ const nextConfig: NextConfig = {
   // Output standalone for better server performance
   output: 'standalone',
 
+  // Allow Cloudflare tunnel origins for the dev server
+  allowedDevOrigins: [
+    'localhost:3000',
+    'loved-marking-procedure-sale.trycloudflare.com',
+    'shelter-key-pix-officer.trycloudflare.com',
+  ],
 };
 
 export default nextConfig;

@@ -172,10 +172,18 @@ export default function GroupDetailsPage() {
           setKeyId(msgWithKey.key_id);
           setIsE2EEReady(true);
           return aesKey;
-        } 
+        }
         catch (err) {
           console.error('[E2EE] Failed to decrypt session key:', err);
+          return null;
         }
+      }
+
+      // Check if there are existing encrypted messages that need decryption
+      const hasEncryptedMessages = msgs.some(m => m.encrypted_content && m.content_iv && m.content_auth_tag);
+      if (hasEncryptedMessages) {
+        console.warn('[E2EE] Existing encrypted messages found but no session key available. Messages will remain encrypted.');
+        return null;
       }
 
       const info = await groupService.getGroupParticipantPublicKeys(groupId);
@@ -233,12 +241,19 @@ export default function GroupDetailsPage() {
     if (!socket || activeTab !== 'chat') return;
     const handleNewGroupMessage = async (message: GroupMessage) => {
       const processedMessage = { ...message };
-      if (sessionKey && message.encrypted_content) {
+      // Only decrypt if we have all required fields
+      if (sessionKey && message.encrypted_content && message.content_iv && message.content_auth_tag) {
         try {
-          const decrypted = await decryptMessageAES(message.encrypted_content, message.content_iv || '', message.content_auth_tag || '', sessionKey);
+          const decrypted = await decryptMessageAES(
+            message.encrypted_content,
+            message.content_iv,
+            message.content_auth_tag,
+            sessionKey
+          );
           processedMessage.encrypted_content = decrypted;
         } catch (err) {
           console.warn('[E2EE] Failed to decrypt real-time message:', err);
+          processedMessage.encrypted_content = '[Encrypted Message]';
         }
       }
       setMessages((prev) => [...prev, { ...processedMessage, is_my_message: message.sender_id === currentUserId || (message.sender?.user_id === currentUserId) }]);
@@ -699,5 +714,4 @@ function EditGroupModal({group, onClose, onSuccess}: {
     </div>
   );
 }
-
 
