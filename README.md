@@ -68,3 +68,10 @@ RUN BOTH: Open two seperate terminal
 ```
 
 Done!!!
+
+## Authors
+- Anamika (B23428)
+- Vyom Thacker (B23417) (Git: https://github.com/vyomthacker)
+- Siddhi Pogakwar (B23415)
+- Divyansh Jain (B23397)
+
