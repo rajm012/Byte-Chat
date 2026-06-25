@@ -3,8 +3,6 @@ import { pool } from '../../lib/db.js';
 import { ApiError } from '../../utils/error.util.js';
 import { getUserProfileCached } from '../userProfileCache.service.js';
 import { resetUnread } from '../unread.service.js';
-import {buildMessagesPageCacheKey, getCachedMessagesPage, getMessagesCacheVersion,
-  setCachedMessagesPage} from '../messagePaginationCache.service.js';
 import { warmRegularConversationCacheForUsers } from './conversation.service.js';
 
 function cursorToString(value: unknown): string | null {
@@ -119,47 +117,6 @@ async function fetchRegularMessagesPage(params: {
   return result.rows as Array<Record<string, unknown>>;
 }
 
-async function preCacheNextMessagesPage(params: {
-  conversationId: string;
-  userId: string;
-  limit: number;
-  searchQuery: string;
-  nextCursor: string;
-  version: number;
-}): Promise<void> {
-  const nextCacheKey = buildMessagesPageCacheKey({
-    conversationId: params.conversationId,
-    userId: params.userId,
-    limit: params.limit,
-    before: params.nextCursor,
-    searchQuery: params.searchQuery,
-    version: params.version,
-  });
-
-  const existing = await getCachedMessagesPage(nextCacheKey);
-  if (existing) {
-    return;
-  }
-
-  const nextRowsDesc = await fetchRegularMessagesPage({
-    conversationId: params.conversationId,
-    userId: params.userId,
-    limit: params.limit,
-    before: params.nextCursor,
-    searchQuery: params.searchQuery,
-  });
-
-  const nextHasMore = nextRowsDesc.length === params.limit;
-  const nextOldestRow = nextRowsDesc[nextRowsDesc.length - 1];
-  const nextNextCursor = nextHasMore ? cursorToString(nextOldestRow?.created_at) : null;
-
-  await setCachedMessagesPage(nextCacheKey, {
-    messages: [...nextRowsDesc].reverse(),
-    hasMore: nextHasMore,
-    nextCursor: nextNextCursor,
-  });
-}
-
 export async function handleGetMessages(req: Request, res: Response) {
   try {
     const userId = req.user?.userId;
@@ -204,39 +161,25 @@ export async function handleGetMessages(req: Request, res: Response) {
     const searchQuery = typeof q === 'string' ? q.trim() : '';
     const beforeCursor = typeof before === 'string' && before.trim().length > 0 ? before.trim() : null;
 
-    const cacheVersion = await getMessagesCacheVersion(String(conversationId));
-    const cacheKey = buildMessagesPageCacheKey({
+    // CACHE DISABLED: Always fetch fresh from database to prevent stale messages
+    // This fixes AWS deployment issues where cache invalidation wasn't working
+    const rowsDesc = await fetchRegularMessagesPage({
       conversationId: String(conversationId),
       userId: String(userId),
       limit: parsedLimit,
       before: beforeCursor,
       searchQuery,
-      version: cacheVersion,
     });
 
-    let pagePayload = await getCachedMessagesPage(cacheKey);
+    const hasMore = rowsDesc.length === parsedLimit;
+    const oldestRow = rowsDesc[rowsDesc.length - 1];
+    const nextCursor = hasMore ? cursorToString(oldestRow?.created_at) : null;
 
-    if (!pagePayload) {
-      const rowsDesc = await fetchRegularMessagesPage({
-        conversationId: String(conversationId),
-        userId: String(userId),
-        limit: parsedLimit,
-        before: beforeCursor,
-        searchQuery,
-      });
-
-      const hasMore = rowsDesc.length === parsedLimit;
-      const oldestRow = rowsDesc[rowsDesc.length - 1];
-      const nextCursor = hasMore ? cursorToString(oldestRow?.created_at) : null;
-
-      pagePayload = {
-        messages: [...rowsDesc].reverse(),
-        hasMore,
-        nextCursor,
-      };
-
-      await setCachedMessagesPage(cacheKey, pagePayload);
-    }
+    const pagePayload = {
+      messages: [...rowsDesc].reverse(),
+      hasMore,
+      nextCursor,
+    };
 
     if (!beforeCursor && searchQuery.length === 0) {
       await pool.query(
@@ -253,18 +196,6 @@ export async function handleGetMessages(req: Request, res: Response) {
 
       await resetUnread(userId, conversationId as string);
       await warmRegularConversationCacheForUsers([String(userId)]);
-    }
-
-    const shouldPrecacheNext = String(prefetchNext) !== '0' && String(prefetchNext).toLowerCase() !== 'false';
-    if (shouldPrecacheNext && pagePayload.hasMore && pagePayload.nextCursor) {
-      void preCacheNextMessagesPage({
-        conversationId: String(conversationId),
-        userId: String(userId),
-        limit: parsedLimit,
-        searchQuery,
-        nextCursor: pagePayload.nextCursor,
-        version: cacheVersion,
-      });
     }
 
     res.json({

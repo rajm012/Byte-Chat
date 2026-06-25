@@ -1,1 +1,0 @@
-{"version":3,"sources":["../../../../src/services/apiBase.ts"],"sourcesContent":["\n// Centralized API base URL utility\nexport const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;\n"],"names":[],"mappings":"6DAEa"}

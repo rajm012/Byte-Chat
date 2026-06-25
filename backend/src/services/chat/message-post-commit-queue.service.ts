@@ -2,13 +2,11 @@ import { randomUUID } from 'crypto';
 import { pool } from '../../lib/db.js';
 import { redis } from '../../lib/redis.js';
 import { emitToConversation, isUserOnline } from '../../socket/index.js';
-import { cacheMessage } from '../messageCache.service.js';
 import { queueOfflineMessage } from '../offlineMessage.service.js';
 import { incrementUnread } from '../unread.service.js';
 import { pushNotification } from '../notification.service.js';
 import { getUserProfileCached } from '../userProfileCache.service.js';
 import {getEncryptedSessionKeyCached} from '../messageDeliveryOptimization.service.js';
-import { bumpMessagesCacheVersion } from '../messagePaginationCache.service.js';
 import { warmRegularConversationCacheForUsers } from './conversation.service.js';
 
 const MESSAGE_POST_COMMIT_STREAM_KEY = 'queue:chat:message-post-commit';
@@ -156,9 +154,9 @@ export async function processRegularMessagePostCommitJob(job: RegularMessagePost
   ]);
 
   await Promise.all([
-    bumpMessagesCacheVersion(job.conversationId),
+    // CACHE DISABLED: Removed bumpMessagesCacheVersion
     warmRegularConversationCacheForUsers([job.senderId, job.recipientId]),
-    cacheMessage(job.conversationId, message),
+    // CACHE DISABLED: Removed cacheMessage
     incrementUnread(job.recipientId, job.conversationId),
   ]);
 

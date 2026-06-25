@@ -1,1 +1,0 @@
-(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,57774,e=>{"use strict";var t=e.i(932),u=e.i(71645),i=e.i(18566);function c(){let e,c,l=(0,t.c)(3),o=(0,i.useRouter)();return l[0]!==o?(e=()=>{o.replace("/login?tab=signup")},c=[o],l[0]=o,l[1]=e,l[2]=c):(e=l[1],c=l[2]),(0,u.useEffect)(e,c),null}e.s(["default",()=>c])}]);
