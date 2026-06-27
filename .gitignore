@@ -12,5 +12,6 @@ frontend/.next/
 
 # others
 .env
+*.pem
 
 backend/dist/
